@@ -1,0 +1,33 @@
+# Build artifacts
+/build/
+/out/
+/deps/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# CMake
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+*.cmake.user
+
+# Binaries
+*.exe
+*.dll
+*.lib
+*.pdb
+*.obj
+
+# Audio files
+*.wav
+*.mp3
+*.mp4
+
+# Logs
+*.log
+
+# Spectr test scripts
+*.spectr
+!std/**/*.spectr
