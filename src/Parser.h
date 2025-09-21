@@ -3,6 +3,7 @@
 #include "Lexer.h"
 #include "Interpreter.hpp"
 #include "Types.h"
+#include "LogSettings.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -10,18 +11,6 @@
 
 class _Interpreter;
 class Interpreter;
-
-struct LogSettings {
-    bool logRaw = false;
-    bool logTokens = true;
-    bool logParsed = true;
-
-    void setDebug() {
-        logRaw = true;
-        logTokens = true;
-        logParsed = true;
-    }
-};
 
 class Parser {
 private:
@@ -34,7 +23,7 @@ private:
     Token next() { return tokens[pos++]; }
 
     std::unique_ptr<Expr> parseExpression(int rbp = 0);
-    Type parseTypeExpr(int rbp = 0);
+    std::unique_ptr<Type> parseTypeExpr(int rbp = 0);
 
     std::unique_ptr<Expr> nud(Token tok);
     std::unique_ptr<Expr> led(Token tok, std::unique_ptr<Expr> left);
@@ -47,12 +36,12 @@ private:
     void parserError(const std::string& msg, size_t line, size_t col);
 
 public:
-    LogSettings logSettings;
+    LogSettings* logSettings;
 
     void parseCode(const std::string& code);
     void parseFile(const std::string& path);
 
     Parser() = default;
-    Parser(_Interpreter* b, const LogSettings& ls)
+    Parser(_Interpreter* b, LogSettings* ls)
         : backend(b), logSettings(ls) { }
 };

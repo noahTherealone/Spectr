@@ -3,12 +3,14 @@
 void BoolExpr::accept(_Interpreter& backend)       { backend.evalExpr(*this); }
 void NumExpr::accept(_Interpreter& backend)        { backend.evalExpr(*this); }
 void IntExpr::accept(_Interpreter& backend)        { backend.evalExpr(*this); }
+void StrExpr::accept(_Interpreter& backend)        { backend.evalExpr(*this); }
 void IdentifierExpr::accept(_Interpreter& backend) { backend.evalExpr(*this); }
 void LabelledExpr::accept(_Interpreter& backend)   { backend.evalExpr(*this); }
 void UnaryExpr::accept(_Interpreter& backend)      { backend.evalExpr(*this); }
 void BinaryExpr::accept(_Interpreter& backend)     { backend.evalExpr(*this); }
 void SignalExpr::accept(_Interpreter& backend)     { backend.evalExpr(*this); }
 void ListExpr::accept(_Interpreter& backend)       { backend.evalExpr(*this); }
+void TupleExpr::accept(_Interpreter& backend)      { backend.evalExpr(*this); }
 void OscPrimExpr::accept(_Interpreter& backend)    { backend.evalExpr(*this); }
 void AssignmentExpr::accept(_Interpreter& backend) { backend.evalExpr(*this); }
 void TypeExpr::accept(_Interpreter& backend)       { }

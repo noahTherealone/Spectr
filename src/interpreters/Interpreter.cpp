@@ -12,22 +12,13 @@ void Interpreter::evalExpr(const IntExpr& expr) {
     setValue(expr.value);
 }
 
+void Interpreter::evalExpr(const StrExpr& expr) {
+    setValue(expr.value);
+}
+
 void Interpreter::evalExpr(const IdentifierExpr& expr) {
-    if (nums.contains(expr.name)) {
-        setValue<float>(nums[expr.name]);
-        std::cout << "Num '" << expr.name << "' > " << std::to_string(nums[expr.name]) << std::endl;
-    } else if (signals.contains(expr.name)) {
-        setValue<Signal>(*signals[expr.name]);
-        std::cout << "Signal '" << expr.name << "' > " << (*signals[expr.name]).to_string() << std::endl;
-    } else if (spectra.contains(expr.name)) {
-        setValue<Spectrum>(*spectra[expr.name]);
-        std::cout << "Spectrum '" << expr.name << "' > " << (*spectra[expr.name]).to_string() << std::endl;
-    } else if (oscillators.contains(expr.name)) {
-        setValue<std::unique_ptr<Oscillator>>(oscillators[expr.name]->clone());
-        std::cout << "Oscillator '" << expr.name << "' > " << (*oscillators[expr.name]).to_string() << std::endl;
-    }
-    else
-        runtimeError("Tried accessing undeclared identifier '" + expr.name + "'.", expr.line, expr.column);
+    // later manage scope here as well
+    getVar(expr.name);
 }
 
 void Interpreter::evalExpr(const LabelledExpr& expr) {
@@ -43,17 +34,17 @@ void Interpreter::evalExpr(const UnaryExpr& expr) {
     if (expr.op == TokenType::Plus) {
         auto value = getValue<float>();
         time += tempo * value;
-        std::cout << "Timestamp: +" << std::to_string(value) << " (@" << std::to_string(time) << ")" << std::endl;
+        println("Timestamp: +" + std::to_string(value) + " (@" + std::to_string(time) + ")");
     }
     else if (expr.op == TokenType::At) {
         auto value = getValue<float>();
         time = value;
-        std::cout << "Timestamp: @" << std::to_string(time) << std::endl;
+        println("Timestamp: @" + std::to_string(time));
     }
-    else if (/*is<float>()*/isType(NUM_TYPE)) {
+    else if (isType(NUM_TYPE)) {
         if (expr.op == TokenType::Minus)
-            setValue<float>(-getValue<float>());
-        else if (/*is<float>()*/isType(NUM_TYPE)) {
+            setValue(-getValue<float>());
+        else if (isType(NUM_TYPE)) {
             auto value = getValue<float>();
             if (value != 0.0f) {
                 setValue<float>(1.0f / value);
@@ -67,10 +58,10 @@ void Interpreter::evalExpr(const UnaryExpr& expr) {
 
 void Interpreter::evalExpr(const BinaryExpr& expr) {
     expr.left->accept(*this);
-    if (/*is<float>()*/isType(NUM_TYPE)) {
+    if (isType(NUM_TYPE)) {
         auto left = getValue<float>();
         expr.right->accept(*this);
-        if (/*is<float>()*/isType(NUM_TYPE)) {
+        if (isType(NUM_TYPE)) {
             auto right = getValue<float>();
             switch (expr.op) {
                 case TokenType::Plus:
@@ -86,22 +77,22 @@ void Interpreter::evalExpr(const BinaryExpr& expr) {
                     setValue<float>(left / right);
                     break;
             }
-            std::cout << "Computed num: " << std::to_string(getValue<float>()) << std::endl;
+            println("Computed num: " + std::to_string(getValue<float>()));
         }
-        else if (/*is<Signal>()*/isType(SIG_TYPE)) {
+        else if (isType(SIG_TYPE)) {
             auto right = getValue<Signal>();
             switch (expr.op) {
                 case TokenType::Plus:
                     setValue<Spectrum>(left + right);
-                    std::cout << "Computed spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+                    println("Computed spectrum: " + getValue<Spectrum>().to_string());
                     break;
                 case TokenType::Star:
                     setValue<Signal>(left * right);
-                    std::cout << "Computed signal: " << getValue<Signal>().to_string() << std::endl;
+                    println("Computed signal: " + getValue<Signal>().to_string());
                     break;
             }
         }
-        else if (/*is<Spectrum>()*/isType(SPECTR_TYPE)) {
+        else if (isType(SPECTR_TYPE)) {
             auto right = getValue<Spectrum>();
             switch (expr.op) {
                 case TokenType::Plus:
@@ -111,43 +102,43 @@ void Interpreter::evalExpr(const BinaryExpr& expr) {
                     setValue<Spectrum>(left * right);
                     break;
             }
-            std::cout << "Computed spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+            println("Computed spectrum: " + getValue<Spectrum>().to_string());
         }
     }
-    else if (/*is<Signal>()*/isType(SIG_TYPE)) {
+    else if (isType(SIG_TYPE)) {
         auto left = getValue<Signal>();
         expr.right->accept(*this);
-        if (/*is<float>()*/isType(NUM_TYPE)) {
+        if (isType(NUM_TYPE)) {
             auto right = getValue<float>();
             switch (expr.op) {
                 case TokenType::Plus:
                     setValue<Spectrum>(left + right);
-                    std::cout << "Computed spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+                    println("Computed spectrum: " + getValue<Spectrum>().to_string());
                     break;
                 case TokenType::Star:
                     setValue<Signal>(left * right);
-                    std::cout << "Computed signal: " << getValue<Signal>().to_string() << std::endl;
+                    println("Computed signal: " + getValue<Signal>().to_string());
                     break;
                 case TokenType::Slash:
                     setValue<Signal>(left / right);
-                    std::cout << "Computed signal: " << getValue<Signal>().to_string() << std::endl;
+                    println("Computed signal: " + getValue<Signal>().to_string());
                     break;
             }
         }
-        else if (/*is<Signal>()*/isType(SIG_TYPE)) {
+        else if (isType(SIG_TYPE)) {
             auto right = getValue<Signal>();
             switch (expr.op) {
                 case TokenType::Plus:
                     setValue<Spectrum>(left + right);
-                    std::cout << "Computed spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+                    println("Computed spectrum: " + getValue<Spectrum>().to_string());
                     break;
                 case TokenType::Star:
                     setValue<Signal>(left * right);
-                    std::cout << "Computed signal: " << getValue<Signal>().to_string() << std::endl;
+                    println("Computed signal: " + getValue<Signal>().to_string());
                     break;
             }
         }
-        else if (/*is<Spectrum>()*/isType(SPECTR_TYPE)) {
+        else if (isType(SPECTR_TYPE)) {
             auto right = getValue<Spectrum>();
             switch (expr.op) {
                 case TokenType::Plus:
@@ -157,13 +148,13 @@ void Interpreter::evalExpr(const BinaryExpr& expr) {
                     setValue<Spectrum>(left * right);
                     break;
             }
-            std::cout << "Computed spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+            println("Computed spectrum: " + getValue<Spectrum>().to_string());
         }
     }
-    else if (/*is<Spectrum>()*/isType(SPECTR_TYPE)) {
+    else if (isType(SPECTR_TYPE)) {
         auto left = getValue<Spectrum>();
         expr.right->accept(*this);
-        if (/*is<float>()*/isType(NUM_TYPE)) {
+        if (isType(NUM_TYPE)) {
             auto right = getValue<float>();
             switch (expr.op) {
                 case TokenType::Plus:
@@ -176,9 +167,9 @@ void Interpreter::evalExpr(const BinaryExpr& expr) {
                     setValue<Spectrum>(left / right);
                     break;
             }
-            std::cout << "Computed spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+            println("Computed spectrum: " + getValue<Spectrum>().to_string());
         }
-        else if (/*is<Signal>()*/isType(SIG_TYPE)) {
+        else if (isType(SIG_TYPE)) {
             auto right = getValue<Signal>();
             switch (expr.op) {
                 case TokenType::Plus:
@@ -188,9 +179,9 @@ void Interpreter::evalExpr(const BinaryExpr& expr) {
                     setValue<Spectrum>(left * right);
                     break;
             }
-            std::cout << "Computed spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+            println("Computed spectrum: " + getValue<Spectrum>().to_string());
         }
-        else if (/*is<Spectrum>()*/isType(SPECTR_TYPE)) {
+        else if (isType(SPECTR_TYPE)) {
             auto right = getValue<Spectrum>();
             switch (expr.op) {
                 case TokenType::Plus:
@@ -200,38 +191,37 @@ void Interpreter::evalExpr(const BinaryExpr& expr) {
                     setValue<Spectrum>(left * right);
                     break;
             }
-            std::cout << "Computed spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+            println("Computed spectrum: " + getValue<Spectrum>().to_string());
         }
     }
-    else if (/*is<std::unique_ptr<Oscillator>>()*/isType(OSC_TYPE)) {
+    else if (isType(OSC_TYPE)) {
         if (expr.op == TokenType::Plus) {
-            auto left = std::move(getValue<std::unique_ptr<Oscillator>>());
+            auto left = getValue<std::shared_ptr<Oscillator>>();
             expr.right->accept(*this);
-            auto right = std::move(getValue<std::unique_ptr<Oscillator>>());
+            auto right = getValue<std::shared_ptr<Oscillator>>();
             if (auto l = dynamic_cast<WavetableOsc*>(left.get())) {
                 if (auto r = dynamic_cast<WavetableOsc*>(right.get())) {
                     auto result = *l + *r;
-                    setValue<std::unique_ptr<Oscillator>>(std::make_unique<CompoundOsc>(std::move(result)));
+                    setValue<std::shared_ptr<Oscillator>>(std::make_shared<CompoundOsc>(result));
                 }
                 else if (auto r = dynamic_cast<CompoundOsc*>(right.get())) {
                     auto result = *l + *r;
-                    setValue<std::unique_ptr<Oscillator>>(std::make_unique<CompoundOsc>(std::move(result)));
+                    setValue<std::shared_ptr<Oscillator>>(std::make_shared<CompoundOsc>(result));
                 }
             }
             else if (auto l = dynamic_cast<CompoundOsc*>(left.get())) {
                 if (auto r = dynamic_cast<WavetableOsc*>(right.get())) {
                     auto result = *l + *r;
-                    setValue<std::unique_ptr<Oscillator>>(std::make_unique<CompoundOsc>(std::move(result)));
+                    setValue<std::shared_ptr<Oscillator>>(std::make_shared<CompoundOsc>(result));
                 }
                 else if (auto r = dynamic_cast<CompoundOsc*>(right.get())) {
                     auto result = *l + *r;
-                    setValue<std::unique_ptr<Oscillator>>(std::make_unique<CompoundOsc>(std::move(result)));
+                    setValue<std::shared_ptr<Oscillator>>(std::make_shared<CompoundOsc>(result));
                 }
             }
             else throw; // invalid left operand
 
-            std::cout << "Computed oscillator: "
-                << getValue<std::unique_ptr<Oscillator>>()->to_string() << std::endl;
+            println("Computed oscillator: " + getValue<std::shared_ptr<Oscillator>>()->to_string());
         }
     }
     else {
@@ -246,35 +236,55 @@ void Interpreter::evalExpr(const SignalExpr& expr) {
     auto ampl = getValue<float>();
 
     setValue<Signal>(Signal(freq, { ampl, 0.0f }));
-    std::cout << "Signal: " << getValue<Signal>().to_string() << std::endl;
+    println("Signal: " + getValue<Signal>().to_string());
 }
 
 void Interpreter::evalExpr(const ListExpr& expr) {
-    Spectrum spec;
-    for (int i = 0; i < expr.signals.size(); ++i) {
-        expr.signals[i]->accept(*this);
-        auto sig = getValue<Signal>();
-        spec.push_back(sig);
+    List list;
+    for (int i = 0; i < expr.list.size(); ++i) {
+        expr.list[i]->accept(*this);
+        if(!currentVal) {
+            runtimeError("Elements of lists must evaluate to something", expr.list[i]->line, expr.list[i]->column);
+            continue;
+        }
+
+        auto val = *currentVal;
+        list.push_back(val);
     }
 
-    setValue<Spectrum>(spec);
-    std::cout << "Spectrum: " << getValue<Spectrum>().to_string() << std::endl;
+    setValue(list);
+    println(typeName(currentVal->type()) + ": " + currentVal->to_string());
+}
+
+void Interpreter::evalExpr(const TupleExpr& expr) {
+    Tuple tuple;
+    for (int i = 0; i < expr.tuple.size(); ++i) {
+        expr.tuple[i]->accept(*this);
+        if(!currentVal) {
+            runtimeError("Elements of tuples must evaluate to something", expr.tuple[i]->line, expr.tuple[i]->column);
+            continue;
+        }
+
+        auto val = *currentVal;
+        tuple.push_back(val);
+    }
+
+    setValue(tuple);
+    println(typeName(currentVal->type()) + ": " + currentVal->to_string());
 }
 
 void Interpreter::evalExpr(const OscPrimExpr& expr) {
     expr.param->accept(*this);
-    if (/*is<Signal>()*/isType(SIG_TYPE)) {
+    if (isType(SIG_TYPE)) {
         Signal signal = getValue<Signal>();
-        setValue<std::unique_ptr<Oscillator>>(std::make_unique<WavetableOsc>(signal, expr.shape, 44100));
-        std::cout << "Primitive osc from signal: "
-            << getValue<std::unique_ptr<Oscillator>>()->to_string() << std::endl;
+        setValue<std::shared_ptr<Oscillator>>(std::make_shared<WavetableOsc>(signal, expr.shape, 44100));
+        println("Primitive osc from signal: " + getValue<std::shared_ptr<Oscillator>>()->to_string());
         return;
     }
-    else if (/*is<Spectrum>()*/isType(SPECTR_TYPE)) {
+    else if (isType(SPECTR_TYPE)) {
         Spectrum spectrum = getValue<Spectrum>();
-        setValue<std::unique_ptr<Oscillator>>(std::make_unique<CompoundOsc>(spectrum, expr.shape, 44100));
-        std::cout << "Primitive osc from spectrum: "
-            << getValue<std::unique_ptr<Oscillator>>()->to_string() << std::endl;
+        setValue<std::shared_ptr<Oscillator>>(std::make_shared<CompoundOsc>(spectrum, expr.shape, 44100));
+        println("Primitive osc from spectrum: " + getValue<std::shared_ptr<Oscillator>>()->to_string());
         return;
     }
 
@@ -282,7 +292,18 @@ void Interpreter::evalExpr(const OscPrimExpr& expr) {
 }
 
 void Interpreter::evalExpr(const AssignmentExpr& expr) {
+    expr.value->accept(*this);
 
+    if (auto* id = dynamic_cast<IdentifierExpr*>(expr.id.get())) {
+        setVar(id->name);
+        setValue(nullptr);
+        return;
+    }
+
+    runtimeError("Assignment requires an identifier to assign to", expr.id->line, expr.id->column);
+    setValue(nullptr);
+    throw;
+    // but later maybe add pattern matching for tuples or something
 }
 
 void Interpreter::evalExpr(const DeclExpr& expr) {
@@ -307,7 +328,7 @@ void Interpreter::evalExpr(const DeclExpr& expr) {
         }
     }
 
-    if (/*!availableName*/varTypes.contains(id->name)) {
+    if (variables.contains(id->name)) {
         runtimeError(
             "Tried declaring already taken name '" + id->name + "'.",
             expr.line, expr.column
@@ -315,55 +336,10 @@ void Interpreter::evalExpr(const DeclExpr& expr) {
         return;
     }
 
-    if (!assign) setValue<int*>(nullptr);
+    if (!assign) clearValue();
     else         assign->value.get()->accept(*this);
 
     declVar(expr.type, id->name);
-
-    /*
-    if (expr.type == DeclType::num) {
-        float value = 0.0f;
-        if (assign) {
-            assign->value->accept(*this);
-            value = getValue<float>();
-        }
-
-        nums.emplace(id->name, value);
-        std::cout << "Num '" << id->name << "' <<< " << value << std::endl;
-    }
-    else if (expr.type == DeclType::signal) {
-        Signal value = Signal::unit;
-        if (assign) {
-            assign->value->accept(*this);
-            value = getValue<Signal>();
-        }
-
-        signals.emplace(id->name, std::make_unique<Signal>(value));
-        std::cout << "Signal '" << id->name << "' <<< " << value.to_string() << std::endl;
-    }
-    else if (expr.type == DeclType::spectr) {
-        Spectrum value = Spectrum::empty;
-        if (assign) {
-            assign->value->accept(*this);
-            value = getValue<Spectrum>();
-        }
-
-        spectra.emplace(id->name, std::make_unique<Spectrum>(value));
-        std::cout << "Spectrum '" << id->name << "' <<< " << value.to_string() << std::endl;
-    }
-    else if (expr.type == DeclType::osc) {
-        if (assign) {
-            assign->value->accept(*this);
-            if (is<std::unique_ptr<Oscillator>>()) {
-                auto reference = std::move(getValue<std::unique_ptr<Oscillator>>());
-                oscillators.emplace(id->name, reference->clone()); // <- here it is
-                std::cout << "Oscillator '" << id->name << "' <<< " << (*reference).to_string() << std::endl;
-            }
-            else {
-                throw;
-            }
-        } 
-    }*/
 }
 
 void Interpreter::evalExpr(const BlockExpr& expr) {
@@ -373,14 +349,14 @@ void Interpreter::evalExpr(const BlockExpr& expr) {
             return; // maybe mark later expressions as unreached
     }
 
-    setValue<int*>(nullptr);
+    setValue(nullptr);
 }
 
 void Interpreter::evalExpr(const OutExpr& expr) {
     if (expr.value)
         expr.value->accept(*this);
     else
-        setValue<int*>(nullptr);
+        setValue(nullptr);
 }
 
 void Interpreter::evalExpr(const FuncApplExpr& expr) {
@@ -403,7 +379,7 @@ void Interpreter::evalExpr(const ReleaseExpr& expr) {
 
 void Interpreter::pushPlaybackEvent(const PlaybackExpr& expr, const std::string* label) {
     expr.osc->accept(*this);
-    auto osc = std::move(getValue<std::unique_ptr<Oscillator>>());
+    auto osc = getValue<std::shared_ptr<Oscillator>>();
     Signal signal;
     if (expr.signal) {
         expr.signal->accept(*this);
@@ -412,118 +388,76 @@ void Interpreter::pushPlaybackEvent(const PlaybackExpr& expr, const std::string*
     else signal = osc->reference;
 
     auto event = PlaybackEvent(std::move(osc), signal, time + (sessionTime ? *sessionTime : 0.0), label);
-    std::cout << "Playback event: @" << std::to_string(event.onset) << " "
-        << event/*->*/.osc->to_string() << ", " << event/*->*/.signal.to_string() << std::endl;
+    println("Playback event: @" + std::to_string(event.onset) + " "
+        + event.osc->to_string() + ", " + event.signal.to_string());
     
-    eventStream->push(event/*, label*/);
-    setValue<int*>(nullptr);
+    eventStream->push(event);
+    setValue(nullptr);
 }
 
-//bool Interpreter::availableName(const std::string& name) {
-//    return !(nums.contains(name) || signals.contains(name) || spectra.contains(name) || oscillators.contains(name));
-//}
-
 void Interpreter::declVar(Type type, const std::string& name) {
-    //if (varTypes.contains(name)) {
-    //    // that check should happen earlier, though, to have position data as well
-    //    runtimeError("Tried declaring already declared variable '" + name + "'.", 0, 0);
-    //    return;
-    //}
 
     if (!type) {
         runtimeError("Declared variables need a type!", 0, 0);
         throw;
     }
 
-    varTypes[name] = type;
-
-    if (type->equals(BOOL_TYPE)) {
-        bool value = false;
-        if (/*is<float>()*/isType(BOOL_TYPE))
-            value = getValue<bool>();
-        else if (!/*is<int*>()*/isEmpty())
-            runtimeError("Tried assigning " + typeName(type) + " '" + name + "' value of wrong type.", 0, 0); // keep track of code position later
-
-        bools.emplace(name, value);
-        std::cout << "Bool '" << name << "' <<< " << (value ? "true" : "false") << std::endl;
-    }
-    else if (type->equals(INT_TYPE)) {
-        int value = 0;
-        if (isType(INT_TYPE))
-            value = getValue<int>();
-        else if (isEmpty())
-            runtimeError("Tried assigning " + typeName(type) + " '" + name + "' value of wrong type.", 0, 0); // keep track of code position later
-
-        ints.emplace(name, value);
-        std::cout << "Int '" << name << "' <<< " << value << std::endl;
-    }
-    else if (type->equals(NUM_TYPE)) {
-        float value = 0.0f;
-        if (/*is<float>()*/isType(NUM_TYPE))
-            value = getValue<float>();
-        else if (!/*is<int*>()*/isEmpty())
-            runtimeError("Tried assigning " + typeName(type) + " '" + name + "' value of wrong type.", 0, 0); // keep track of code position later
-
-        nums.emplace(name, value);
-        std::cout << "Num '" << name << "' <<< " << value << std::endl;
-    }
-    else if (type->equals(SIG_TYPE)) {
-        Signal value = Signal::unit;
-        if (/*is<Signal>()*/isType(SIG_TYPE))
-            value = getValue<Signal>();
-        else if (!/*is<int*>()*/isEmpty())
-            runtimeError("Tried assigning " + typeName(type) + " '" + name + "' value of wrong type.", 0, 0); // keep track of code position later
-
-
-        signals.emplace(name, std::make_unique<Signal>(value));
-        std::cout << "Signal '" << name << "' <<< " << value.to_string() << std::endl;
-    }
-    else if (type->equals(SPECTR_TYPE)) {
-        Spectrum value = Spectrum::empty;
-        if (/*is<Spectrum>()*/isType(SPECTR_TYPE))
-            value = getValue<Spectrum>();
-        else if (!/*is<int*>()*/isEmpty())
-            runtimeError("Tried assigning " + typeName(type) + " '" + name + "' value of wrong type.", 0, 0); // keep track of code position later
-
-
-        spectra.emplace(name, std::make_unique<Spectrum>(value));
-        std::cout << "Spectrum '" << name << "' <<< " << value.to_string() << std::endl;
-    }
-    else if (type->equals(OSC_TYPE)) {
-        if (!/*is<std::unique_ptr<Oscillator>>()*/isType(OSC_TYPE)) {
-            if (/*is<int*>()*/isEmpty())
-                runtimeError("Variable '" + name + "' of type " + typeName(type) + " needs value at declaration.", 0, 0); // keep track of code position later
-            else
-                runtimeError("Tried assigning " + typeName(type) + " '" + name + "' value of wrong type.", 0, 0); // keep track of code position later
+    if (!currentVal) {
+        if (const Value* value = defaultValue(type)) {
+            variables.emplace(name, *value);
+            std::cout << typeName(variables.at(name).type()) + " '" + name + "' <<< " + variables.at(name).to_string() + " (default value)" << std::endl;
             return;
         }
 
-        auto reference = std::move(getValue<std::unique_ptr<Oscillator>>());
-        oscillators.emplace(name, reference->clone());
-        std::cout << "Oscillator '" << name << "' <<< " << (*reference).to_string() << std::endl;
+        runtimeError("Type " + typeName(type) + " needs an initialization value", 0, 0);
+        throw;
     }
-    else {
-        std::any var = getValueAsAny();
-        vars.emplace(name, var);
-        std::cout << typeName(type) << " '" << name << "' <<< some value";
+
+    if (type != currentVal->type()) {
+        runtimeError("Tried assigning " + typeName(type) + " '" + name + "' value of wrong type " + typeName(currentVal->type()), 0, 0);
+        throw;
     }
-    //else {
-    //    runtimeError("Tried declaring currently unsupported type " + typeName(std::move(type)) + ".", 0, 0); // keep track of code position later
-    //}
+
+    variables.emplace(name, *currentVal);
+    println(typeName(variables.at(name).type()) + " '" + name + "' <<< " + variables.at(name).to_string());
 }
 
 void Interpreter::getVar(const std::string& name) {
+    if (!variables.contains(name)) {
+        runtimeError("Tried accessing undeclared identifier '" + name + "'.", /*expr.line*/0, /*expr.column*/0);
+        setValue(nullptr);
+        return;
+    }
 
+    currentVal = std::make_unique<Value>(variables.at(name));
+    println(typeName(variables.at(name).type()) + " '" + name + "' > " + variables.at(name).to_string());
 }
 
 void Interpreter::setVar(const std::string& name) {
+    if (!variables.contains(name)) {
+        runtimeError("Tried assigning undeclared identifier '" + name + "'", 0, 0);
+        throw;
+    }
 
+    Type type = variables.at(name).type();
+
+    if (!currentVal) {
+        runtimeError("Assignment value must evaluate to something", 0, 0);
+        throw;
+    }
+
+    try {
+        variables.at(name) = *currentVal;
+        println(typeName(variables.at(name).type()) + " '" + name + "' << " + variables.at(name).to_string());
+    } catch (const std::runtime_error& e) {
+        runtimeError(e.what(), 0, 0);
+        throw;
+    }
 }
 
-void Interpreter::parserError(const std::string& msg, size_t line, size_t col) {
-    std::cout << "\033[0;31mParser error at ("
-        << std::to_string(line) << ":" << std::to_string(col) << "): "
-        << msg << "\033[0m" << std::endl;
+void Interpreter::println(const std::string& msg) {
+    if (logSettings->logOutput && !logSettings->hideAll)
+        std::cout << msg << std::endl;
 }
 
 void Interpreter::runtimeError(const std::string& msg, size_t line, size_t col) {

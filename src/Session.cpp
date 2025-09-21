@@ -99,11 +99,14 @@ void dataCallback(ma_device* device, void* output, const void* input, ma_uint32 
     gStreamTime += (double)frameCount / gSampleRate;
 }
 
-int initSession(const LogSettings& logSettings, const std::string& exeDir, const std::string* setupPath) {
-    Interpreter backend = Interpreter(&gEventStream, &gStreamTime);
+int initSession(LogSettings* logSettings, const std::string& exeDir, const std::string* setupPath) {
+    Interpreter backend = Interpreter(&gEventStream, logSettings, &gStreamTime);
     parser = Parser(&backend, logSettings);
 
-    // parser.parseFile(exeDir + "/std/private/session_init.spectr");
+    bool hidAll = logSettings->hideAll;
+    logSettings->hideAll = true;
+    parser.parseFile(exeDir + "/std/private/session_init.spectr");
+    logSettings->hideAll = hidAll;
 
     if (setupPath) {
         std::cout << "---- SETUP ----" << std::endl;
@@ -125,7 +128,7 @@ int initSession(const LogSettings& logSettings, const std::string& exeDir, const
 
     ma_device_start(&device);
 
-    std::cout << "Input>" << std::endl;
+    std::cout << "\033[1;35mInput>\033[0m" << std::endl;
 
     while (true) {
         std::string line;
@@ -147,7 +150,7 @@ int initSession(const LogSettings& logSettings, const std::string& exeDir, const
         // std::lock_guard<std::mutex> lock(gMutex);
         parser.parseCode(line); // sends parsed code to backend pushes events to the stream
 
-        std::cout << "Input>" << std::endl;
+        std::cout << "\033[1;35mInput>\033[0m" << std::endl;
     }
 
     ma_device_uninit(&device);

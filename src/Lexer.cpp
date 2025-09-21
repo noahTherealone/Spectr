@@ -75,7 +75,9 @@ Token Lexer::tokenizeString() {
         advance();
     }
 
-    return Token{ TokenType::String, str.substr(start, pos - start), line, startCol, start };
+    advance();
+
+    return Token{ TokenType::String, str.substr(start, pos - start - 1), line, startCol, start };
 }
 
 Token Lexer::tokenizeName() {
@@ -148,6 +150,9 @@ std::vector<Token> Lexer::tokenize(const std::string& input) {
         } else if (str[pos] == '\'') {
             advance();
             tokens.push_back(tokenizeLabel());
+        } else if (str[pos] == '"') {
+            advance();
+            tokens.push_back(tokenizeString());
         } else if (str[pos] == '+') {
             tokens.push_back(makeToken(TokenType::Plus, "+"));
             advance();

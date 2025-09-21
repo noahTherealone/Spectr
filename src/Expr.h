@@ -35,6 +35,13 @@ struct IntExpr : Expr {
     IntExpr(int v, size_t l, size_t c) : value(v) { line = l; column = c; }
 };
 
+struct StrExpr : Expr {
+    std::string value;
+    std::string to_string() const override { return "\"" + value + "\""; }
+    void accept(_Interpreter& backend) override;
+    StrExpr(const std::string& v, size_t l, size_t c) : value(v) { line = l; column = c; }
+};
+
 struct IdentifierExpr : Expr {
     std::string name;
     std::string to_string() const override { return name; }
@@ -86,18 +93,33 @@ struct SignalExpr : Expr {
 };
 
 struct ListExpr : Expr {
-    std::vector<std::unique_ptr<Expr>> signals;
+    std::vector<std::unique_ptr<Expr>> list;
     std::string to_string() const override {
         std::string str = "{ ";
-        for (size_t i = 0; i < signals.size(); ++i)
-            str.append(signals[i]->to_string() + " ");
+        for (size_t i = 0; i < list.size(); ++i)
+            str.append(list[i]->to_string() + " ");
         
         str.append("}");
         return str;
     }
     void accept(_Interpreter& backend) override;
-    ListExpr(std::vector<std::unique_ptr<Expr>> sig, size_t l, size_t c)
-        : signals(std::move(sig)) { line = l; column = c; }
+    ListExpr(std::vector<std::unique_ptr<Expr>> L, size_t l, size_t c)
+        : list(std::move(L)) { line = l; column = c; }
+};
+
+struct TupleExpr : Expr {
+    std::vector<std::unique_ptr<Expr>> tuple;
+    std::string to_string() const override {
+        std::string str = "(";
+        for (size_t i = 0; i < tuple.size(); ++i)
+            str.append((i != 0 ? ", " : "") + tuple[i]->to_string());
+        
+        str.append(")");
+        return str;
+    }
+    void accept(_Interpreter& backend) override;
+    TupleExpr(std::vector<std::unique_ptr<Expr>> T, size_t l, size_t c)
+        : tuple(std::move(T)) { line = l; column = c; }
 };
 
 OscPrim to_osc_prim(TokenType t);
@@ -167,7 +189,7 @@ struct TypeExpr : Expr {
         return typeName(type);
     }
     void accept(_Interpreter& backend) override; // doesn't do anything for now
-    TypeExpr(/*DeclType*/Type t, std::unique_ptr<Expr> d, size_t l, size_t c)
+    TypeExpr(Type t, size_t l, size_t c)
         : type(t) { line = l; column = c; }
 };
 

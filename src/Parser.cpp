@@ -10,8 +10,8 @@ std::unique_ptr<Expr> Parser::parseExpression(int rbp) {
     while (pos < tokens.size() && rbp < lbp(peek().type)) {
         tok = next();
         if (pos >= tokens.size()) {
-            std::cerr << "Expected token after '" << tok.text << "'\n";
-            break;
+            parserError("Expected token after '" + tok.text, tokens.back().line, tokens.back().column);
+            throw;
         }
         left = led(tok, std::move(left));
     }
@@ -19,17 +19,17 @@ std::unique_ptr<Expr> Parser::parseExpression(int rbp) {
     return left;
 }
 
-Type Parser::parseTypeExpr(int rbp) {
+std::unique_ptr<Type> Parser::parseTypeExpr(int rbp) {
     if (pos >= tokens.size()) { return nullptr; }
     Token tok = next();
-    Type left = typeNud(tok);
+    std::unique_ptr<Type> left = std::make_unique<Type>(typeNud(tok));
     while (pos < tokens.size() && rbp < typeLbp(peek().type)) {
         tok = next();
         if (pos >= tokens.size()) {
-            std::cerr << "Expected token after '" << tok.text << "'\n";
-            break;
+            parserError("Expected token after '" + tok.text, tokens.back().line, tokens.back().column);
+            throw;
         }
-        left = typeLed(tok, left);
+        left = std::make_unique<Type>(typeLed(tok, *left));
     }
 
     return left;
@@ -45,6 +45,8 @@ std::unique_ptr<Expr> Parser::nud(Token tok) {
             return std::make_unique<BoolExpr>(true, tok.line, tok.column);
         case TokenType::FALSE:
             return std::make_unique<BoolExpr>(false, tok.line, tok.column);
+        case TokenType::String:
+            return std::make_unique<StrExpr>(tok.text, tok.line, tok.column);
         case TokenType::Identifier:
             return std::make_unique<IdentifierExpr>(tok.text, tok.line, tok.column);
         case TokenType::Label: {
@@ -64,8 +66,7 @@ std::unique_ptr<Expr> Parser::nud(Token tok) {
         case TokenType::Type:
         case TokenType::Dollar: {
             pos--;
-            Type type = parseTypeExpr();
-            std::cout << typeName(type) << std::endl;
+            Type type = *parseTypeExpr();
 
             if (pos >= tokens.size()) {
                 parserError("Expected declaration after type", 0, 0);
@@ -85,31 +86,60 @@ std::unique_ptr<Expr> Parser::nud(Token tok) {
             return std::make_unique<OscPrimExpr>(to_osc_prim(tok.type), std::move(param), tok.line, tok.column);
         }
         case TokenType::LParen: {
-            auto expr = parseExpression();
-            if (peek().type != TokenType::RParen) {
-                throw std::runtime_error(
-                    "Expected ')' at (" + 
-                    std::to_string(peek().line) + ":" + 
-                    std::to_string(peek().column) + ")"
-                );
+            pos--;
+            if (Type type = *parseTypeExpr()) {
+                std::cout << peek().text << std::endl;
+                if (auto decl = parseExpression()) {
+                    return std::make_unique<DeclExpr>(type, std::move(decl), tok.line, tok.column);
+                }
+
+                parserError("Expected declaration after type", tok.line, tok.column);
+                throw;
             }
-            next();
-            return expr;
+
+            std::vector<std::unique_ptr<Expr>> tuple;
+            while (pos < tokens.size()) {
+                tuple.push_back(parseExpression());
+                if (next().type == TokenType::RParen) {
+                    if (tuple.size() == 1)
+                        return std::move(tuple[0]);
+                    else
+                        return std::make_unique<TupleExpr>(std::move(tuple), tok.line, tok.column);
+                }
+                
+                pos--;
+                if (next().type != TokenType::Comma) {
+                    parserError("Elements of tuples must be separated with commas ','", tokens[pos-1].line, tokens[pos-1].column);
+                    throw;
+                }
+            }
+
+            parserError("Parentheses must be closed with ')'", tokens.back().line, tokens.back().column);
+            throw;
         }
         case TokenType::LBrace: {
-            std::vector<std::unique_ptr<Expr>> signals;
+            pos--;
+            if (Type type = *parseTypeExpr()) {
+                if (pos >= tokens.size()) {
+                    parserError("Expected declaration after type", tok.line, tok.column);
+                    throw;
+                }
+
+                auto decl = parseExpression();
+                return std::make_unique<DeclExpr>(type, std::move(decl), tok.line, tok.column);
+            }
+
+            std::vector<std::unique_ptr<Expr>> list;
             while (pos < tokens.size()) {
                 if (peek().type == TokenType::RBrace) {
                     next();
-                    return std::make_unique<ListExpr>(std::move(signals), tok.line, tok.column);
+                    return std::make_unique<ListExpr>(std::move(list), tok.line, tok.column);
                 }
                 
-                signals.push_back(std::move(parseExpression()));
+                list.push_back(std::move(parseExpression()));
             }
-            throw std::runtime_error(
-                "Expected '}' at (" + 
-                std::to_string(tokens.back().line) + ":" + 
-                std::to_string(tokens.back().column) + ")"
+            parserError(
+                "Lists need to be closed with '}'", tokens.back().line, tokens.back().column
             );
         }
         case TokenType::LBracket: {
@@ -192,39 +222,59 @@ std::unique_ptr<Expr> Parser::led(Token tok, std::unique_ptr<Expr> left) {
 Type Parser::typeNud(Token tok) {
     switch (tok.type) {
         case TokenType::Type: {
+            std::cout << "Parsed " << typeName(fromString(tok.text)) << std::endl;
             return fromString(tok.text);
         }
         case TokenType::LParen: {
-            next();
-            std::vector<Type> inner{ parseTypeExpr() };
-            if (pos >= tokens.size()) throw; // parentheses need to be closed
-            while (peek().type != TokenType::RParen) {
-                if (next().type == TokenType::Comma) {
-                    inner.push_back(parseTypeExpr());
+            size_t startPos = pos;
+            std::vector<Type> tuple;
+            while (pos < tokens.size()) {
+                if (Type elem = *parseTypeExpr())
+                    tuple.push_back(*parseTypeExpr());
+                else {
+                    pos = startPos;
+                    return nullptr;
                 }
-                else throw; //unexpected token
 
-                if (pos >= tokens.size()) throw; // parentheses need to be closed
-            }                
-            
-            if (inner.size() == 1)
-                return inner[0];
-            else
-                return std::make_shared<TupleType>(inner);
+                pos--;
+                if (next().type == TokenType::RParen) {
+                    if (tuple.size() == 1)
+                        return tuple[0];
+                    else {
+                        std::cout << "Parsed " << typeName(std::make_shared<TupleType>(tuple)) << std::endl;
+                        return std::make_shared<TupleType>(tuple);
+                    }
+                }
+
+                pos--;
+                if (next().type != TokenType::Comma) {
+                    parserError("Expected ',' to separate types in tuple", tokens[pos-1].line, tokens[pos-1].column);
+                    throw; //unexpected token
+                }
+            }
+
+            parserError("Tuple type must be closed with ')'", tokens.back().line, tokens.back().column);
+            throw;
         }
         case TokenType::LBrace: {
-            next();
-            Type inner = parseTypeExpr();
-            if (pos >= tokens.size() || next().type != TokenType::RBrace)
-                throw; // braces need to be closed
+            size_t startPos = pos;
+            if(Type inner = *parseTypeExpr()) {
+                if (pos >= tokens.size() || next().type != TokenType::RBrace) {
+                    parserError("List types must be closed with '}'", tok.line, tok.column);
+                    throw;
+                }
+                    
+                return std::make_shared<ListType>(inner);
+            }   
             
-            return std::make_shared<ListType>(inner);
+            pos = startPos;
+            return nullptr;
         }
         case TokenType::Dollar: {
             std::shared_ptr<TupleType> input;
             if (peek().type != TokenType::Arrow) {
-                Type first = parseTypeExpr();
-                if (auto* in = dynamic_cast<TupleType*>(first.get()))
+                Type first = *parseTypeExpr();
+                if (auto* in = dynamic_cast<const TupleType*>(first.get()))
                     input = std::make_shared<TupleType>(*in);
                 else
                     input = std::make_shared<TupleType>(TupleType({ first }));
@@ -234,19 +284,18 @@ Type Parser::typeNud(Token tok) {
                 return std::make_shared<LambdaType>(input, nullptr);
             
             next();
-            Type output = parseTypeExpr();
+            Type output = *parseTypeExpr();
             return std::make_shared<LambdaType>(input, output);
         }
     }
 
-    parserError("Unexpected type prefix token '" + tok.text + "'.", tok.line, tok.column);
-    throw;
+    return nullptr;
 }
 
 Type Parser::typeLed(Token tok, Type left) {
     switch (tok.type) {
         case TokenType::Vert:
-            Type right = parseTypeExpr();
+            Type right = *parseTypeExpr();
             return std::make_shared<VariantType>(left, right);
     }
 
@@ -292,14 +341,14 @@ void Parser::parseCode(const std::string& code) {
 
 // ----- logs --------------------------
 
-        if (logSettings.logRaw) {
+        if (logSettings->logRaw && !logSettings->hideAll) {
             size_t endc = pos < tokens.size() ? tokens[pos].pos : code.size();
             std::string rawCode = code.substr(tokens[lastPos].pos, endc - tokens[lastPos].pos);
             if (rawCode.back() != '\n') rawCode.append("\n");
             std::cout << "\033[1;34mRaw code>\033[0m" << std::endl << rawCode;
         }
 
-        if (logSettings.logTokens) {
+        if (logSettings->logTokens && !logSettings->hideAll) {
             std::cout << "\033[1;34mTokenized code>\033[0m" << std::endl;
 
             for (size_t i = lastPos; i < pos; ++i)
@@ -307,14 +356,18 @@ void Parser::parseCode(const std::string& code) {
             std::cout << std::endl;
         }
 
-        if (logSettings.logParsed) {
+        if (logSettings->logParsed && !logSettings->hideAll) {
             std::cout << "\033[1;34mParsed code>\033[0m" << std::endl;
             std::cout << parsed->to_string() << std::endl;
         }
 
-        std::cout << "\033[1;36mOutput>\033[0m" << std::endl;
+        if (logSettings->logOutput && !logSettings->hideAll)
+            std::cout << "\033[1;36mOutput>\033[0m" << std::endl;
+        
         parsed->accept(*backend);
-        std::cout << std::endl;
+
+        if (logSettings->logOutput && !logSettings->hideAll)
+            std::cout << std::endl;
 
         lastPos = pos;
     }

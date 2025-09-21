@@ -1,3 +1,4 @@
+#include "LogSettings.h"
 #include "Parser.h"
 #include "Synthesizer.h"
 #include "Session.h"
@@ -38,7 +39,7 @@ int main(int argc, char** argv) {
 
     LogSettings logSettings;
 
-    for (int i = 0; i < argc; ++i) {
+    for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (sessionSetup) {
             if (arg.starts_with("--")) {
@@ -73,14 +74,14 @@ int main(int argc, char** argv) {
     }
 
     if (mode == SpectrMode::Session)
-        return initSession(logSettings, exeDir.string(), setupPath);
+        return initSession(&logSettings, exeDir.string(), setupPath);
 
     std::cout << path << std::endl;
 
     PlaybackEventStream events;
 
-    std::unique_ptr<_Interpreter> backend = std::make_unique<Interpreter>(&events);
-    Parser parser(backend.get(), logSettings);
+    std::unique_ptr<_Interpreter> backend = std::make_unique<Interpreter>(&events, &logSettings);
+    Parser parser(backend.get(), &logSettings);
     
     try {
         parser.parseFile(path);
