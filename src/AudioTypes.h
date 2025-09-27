@@ -4,6 +4,7 @@
 #include <vector>
 #include <numbers>
 #include <iostream> // only for testing, remove later!
+#include <memory>
 
 struct Signal {
     float freq = 0.0f;
@@ -146,8 +147,17 @@ struct Oscillator {
     virtual ~Oscillator() { }
 };
 
+const size_t WAVETABLE_LENGTH = 2048;
+
 struct WavetableOsc : public Oscillator {
+    enum class InterpMode {
+        None,
+        Linear,
+        Quadratic
+    };
+
     std::vector<float> table;
+    InterpMode interp = InterpMode::Linear;
 
     float wave(double time, const Signal& factor) const override;
     size_t sampleNumber() const override;
@@ -156,25 +166,24 @@ struct WavetableOsc : public Oscillator {
 
     WavetableOsc(Signal sig, OscPrim shape, int sampleRate) {
         reference = sig;
-        size_t length = sampleRate / sig.freq;
         float amp = std::abs(sig.amp);
         if (shape == OscPrim::Sine) {
-            for (size_t i = 0; i < length; ++i) {
-                table.push_back(amp * sin(2 * std::numbers::pi * (double)i / length));
+            for (size_t i = 0; i < WAVETABLE_LENGTH; ++i) {
+                table.push_back(amp * sin(2 * 3.1415926535897932384626433 * (double)i / WAVETABLE_LENGTH));
             }
         }
         else if (shape == OscPrim::Square) {
             size_t i = 0;
-            for (; i+i < length; ++i) {
+            for (; i+i < WAVETABLE_LENGTH; ++i) {
                 table.push_back(amp);
             }
-            for (; i < length; ++i) {
+            for (; i < WAVETABLE_LENGTH; ++i) {
                 table.push_back(-amp);
             }
         }
         else if (shape == OscPrim::Saw) {
-            for (size_t i = 0; i < length; ++i) {
-                table.push_back(amp * (1.0 - 2 * (double)i / length));
+            for (size_t i = 0; i < WAVETABLE_LENGTH; ++i) {
+                table.push_back(amp * (1.0 - 2 * (double)i / WAVETABLE_LENGTH));
             }
         }
     }

@@ -25,8 +25,14 @@ target_include_directories(Spectr PRIVATE
     ${CMAKE_SOURCE_DIR}/deps/rtmidi-6.0.0
 )
 
-target_compile_definitions(Spectr PRIVATE __WINDOWS_MM__)
-target_link_libraries(Spectr PRIVATE winmm)
+if(WIN32)
+    target_compile_definitions(Spectr PRIVATE __WINDOWS_MM__)
+    target_link_libraries(Spectr PRIVATE winmm)
+elseif(UNIX)
+    target_compile_definitions(Spectr PRIVATE __LINUX_ALSA__)
+    find_package(Threads REQUIRED)
+    target_link_libraries(Spectr PRIVATE Threads::Threads asound)
+endif()
 
 add_custom_command(TARGET Spectr POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory

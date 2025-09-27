@@ -4,7 +4,9 @@
 #include "Session.h"
 #include <iostream>
 #include <string>
-#include <windows.h>
+#ifdef _WIN32
+    #include <windows.h>
+#endif
 #include <filesystem>
 
 std::filesystem::path getExecutableDir() {

@@ -55,15 +55,28 @@ void midiCallback(double timeStamp, std::vector<unsigned char> *message, void *u
 }
 
 void setupMidiIn() {
+#ifdef _WIN32
     midiin = new RtMidiIn(RtMidi::WINDOWS_MM);
+#else
+    midiin = new RtMidiIn(RtMidi::LINUX_ALSA);
+#endif
 
-    // Open the first available input port
-    if (midiin->getPortCount() > 0) {
-        midiin->openPort(0);
+    size_t nPorts = midiin->getPortCount();
+    std::cout << "Found " << nPorts << " MIDI input ports\n";
+
+    for (size_t i = 0; i < nPorts; i++) {
+        if (((std::string)midiin->getPortName(i)).starts_with("Midi Through"))
+            continue;
+
+        midiin->openPort(i);
         midiin->setCallback(&midiCallback);
         midiin->ignoreTypes(false, false, false); // don't ignore sysex, timing, active sense
-        std::cout << "Opened midi port!" << std::endl;
-    } else {
+        std::cout << "Opened port " << i << ": " << midiin->getPortName(i) << '\n';
+
+        return;
+    }
+
+    if (nPorts == 0) {
         std::cout << "No MIDI input ports available!" << std::endl;
     }
 }

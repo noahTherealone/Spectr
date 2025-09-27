@@ -262,8 +262,6 @@ inline Type fromString(const std::string& name) {
 }
 
 inline std::string typeName(Type type) {
-    std::cout << (type ? "has a type" : "has no type") << std::endl;
-
     for (auto it : namedTypes) {
         if (it.second == type)
             return it.first;
@@ -526,8 +524,7 @@ inline const Value* defaultValue(const Type& type) {
     if (auto* tuple = dynamic_cast<const TupleType*>(type.get())) {
         Tuple values;
         for (auto elem : tuple->types) {
-            if (auto* def = defaultValue(type)) {
-                std::cout << typeName(getType(*def)) << std::endl;
+            if (auto* def = defaultValue(elem)) {
                 values.push_back(*def);
             }
             else

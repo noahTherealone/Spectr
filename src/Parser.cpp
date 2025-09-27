@@ -19,17 +19,22 @@ std::unique_ptr<Expr> Parser::parseExpression(int rbp) {
     return left;
 }
 
-std::unique_ptr<Type> Parser::parseTypeExpr(int rbp) {
+Type Parser::parseTypeExpr(int rbp) {
     if (pos >= tokens.size()) { return nullptr; }
     Token tok = next();
-    std::unique_ptr<Type> left = std::make_unique<Type>(typeNud(tok));
+    size_t startPos = pos;
+    Type left = typeNud(tok);
+    if (!left) {
+        pos = startPos;
+        return left;
+    }
     while (pos < tokens.size() && rbp < typeLbp(peek().type)) {
         tok = next();
         if (pos >= tokens.size()) {
             parserError("Expected token after '" + tok.text, tokens.back().line, tokens.back().column);
             throw;
         }
-        left = std::make_unique<Type>(typeLed(tok, *left));
+        left = typeLed(tok, left);
     }
 
     return left;
@@ -66,7 +71,7 @@ std::unique_ptr<Expr> Parser::nud(Token tok) {
         case TokenType::Type:
         case TokenType::Dollar: {
             pos--;
-            Type type = *parseTypeExpr();
+            Type type = parseTypeExpr();
 
             if (pos >= tokens.size()) {
                 parserError("Expected declaration after type", 0, 0);
@@ -87,7 +92,7 @@ std::unique_ptr<Expr> Parser::nud(Token tok) {
         }
         case TokenType::LParen: {
             pos--;
-            if (Type type = *parseTypeExpr()) {
+            if (Type type = parseTypeExpr()) {
                 std::cout << peek().text << std::endl;
                 if (auto decl = parseExpression()) {
                     return std::make_unique<DeclExpr>(type, std::move(decl), tok.line, tok.column);
@@ -119,7 +124,7 @@ std::unique_ptr<Expr> Parser::nud(Token tok) {
         }
         case TokenType::LBrace: {
             pos--;
-            if (Type type = *parseTypeExpr()) {
+            if (Type type = parseTypeExpr()) {
                 if (pos >= tokens.size()) {
                     parserError("Expected declaration after type", tok.line, tok.column);
                     throw;
@@ -222,26 +227,23 @@ std::unique_ptr<Expr> Parser::led(Token tok, std::unique_ptr<Expr> left) {
 Type Parser::typeNud(Token tok) {
     switch (tok.type) {
         case TokenType::Type: {
-            std::cout << "Parsed " << typeName(fromString(tok.text)) << std::endl;
             return fromString(tok.text);
         }
         case TokenType::LParen: {
             size_t startPos = pos;
             std::vector<Type> tuple;
             while (pos < tokens.size()) {
-                if (Type elem = *parseTypeExpr())
-                    tuple.push_back(*parseTypeExpr());
+                if (Type elem = parseTypeExpr())
+                    tuple.push_back(elem);
                 else {
                     pos = startPos;
                     return nullptr;
                 }
 
-                pos--;
                 if (next().type == TokenType::RParen) {
                     if (tuple.size() == 1)
                         return tuple[0];
                     else {
-                        std::cout << "Parsed " << typeName(std::make_shared<TupleType>(tuple)) << std::endl;
                         return std::make_shared<TupleType>(tuple);
                     }
                 }
@@ -258,7 +260,7 @@ Type Parser::typeNud(Token tok) {
         }
         case TokenType::LBrace: {
             size_t startPos = pos;
-            if(Type inner = *parseTypeExpr()) {
+            if(Type inner = parseTypeExpr()) {
                 if (pos >= tokens.size() || next().type != TokenType::RBrace) {
                     parserError("List types must be closed with '}'", tok.line, tok.column);
                     throw;
@@ -273,7 +275,7 @@ Type Parser::typeNud(Token tok) {
         case TokenType::Dollar: {
             std::shared_ptr<TupleType> input;
             if (peek().type != TokenType::Arrow) {
-                Type first = *parseTypeExpr();
+                Type first = parseTypeExpr();
                 if (auto* in = dynamic_cast<const TupleType*>(first.get()))
                     input = std::make_shared<TupleType>(*in);
                 else
@@ -284,7 +286,7 @@ Type Parser::typeNud(Token tok) {
                 return std::make_shared<LambdaType>(input, nullptr);
             
             next();
-            Type output = *parseTypeExpr();
+            Type output = parseTypeExpr();
             return std::make_shared<LambdaType>(input, output);
         }
     }
@@ -295,7 +297,7 @@ Type Parser::typeNud(Token tok) {
 Type Parser::typeLed(Token tok, Type left) {
     switch (tok.type) {
         case TokenType::Vert:
-            Type right = *parseTypeExpr();
+            Type right = parseTypeExpr();
             return std::make_shared<VariantType>(left, right);
     }
 

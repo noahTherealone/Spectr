@@ -23,7 +23,7 @@ private:
     Token next() { return tokens[pos++]; }
 
     std::unique_ptr<Expr> parseExpression(int rbp = 0);
-    std::unique_ptr<Type> parseTypeExpr(int rbp = 0);
+    Type parseTypeExpr(int rbp = 0);
 
     std::unique_ptr<Expr> nud(Token tok);
     std::unique_ptr<Expr> led(Token tok, std::unique_ptr<Expr> left);
