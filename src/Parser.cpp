@@ -70,16 +70,23 @@ std::unique_ptr<Expr> Parser::nud(Token tok) {
             return std::make_unique<OutExpr>(parseExpression(0), tok.line, tok.column);
         case TokenType::Type:
         case TokenType::Dollar: {
-            pos--;
-            Type type = parseTypeExpr();
 
-            if (pos >= tokens.size()) {
-                parserError("Expected declaration after type", 0, 0);
-                throw;
+            size_t startPos = pos;
+            pos--;
+            if (Type type = parseTypeExpr()) {
+                if (pos >= tokens.size()) {
+                    parserError("Expected declaration after type", 0, 0);
+                    throw;
+                }
+
+                auto decl = parseExpression();
+                return std::make_unique<DeclExpr>(type, std::move(decl), tok.line, tok.column);
             }
 
-            auto decl = parseExpression();
-            return std::make_unique<DeclExpr>(type, std::move(decl), tok.line, tok.column);
+            pos = startPos;
+            std::unique_ptr<Expr> signature = parseExpression();
+            std::unique_ptr<Expr> body = parseExpression();
+            
         }
         case TokenType::Sine:
         case TokenType::Square:

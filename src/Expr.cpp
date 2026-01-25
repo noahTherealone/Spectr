@@ -17,6 +17,7 @@ void TypeExpr::accept(_Interpreter& backend)       { }
 void DeclExpr::accept(_Interpreter& backend)       { backend.evalExpr(*this); }
 void BlockExpr::accept(_Interpreter& backend)      { backend.evalExpr(*this); }
 void OutExpr::accept(_Interpreter& backend)        { backend.evalExpr(*this); }
+void LambdaExpr::accept(_Interpreter& backend)     { backend.evalExpr(*this); }
 void FuncApplExpr::accept(_Interpreter& backend)   { backend.evalExpr(*this); }
 void PlaybackExpr::accept(_Interpreter& backend)   { backend.evalExpr(*this); }
 void ReleaseExpr::accept(_Interpreter& backend)    { backend.evalExpr(*this); }

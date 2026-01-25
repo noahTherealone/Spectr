@@ -230,6 +230,32 @@ struct OutExpr : Expr {
         : value(std::move(v)) { line = l; column = c; }
 };
 
+struct SignatureExpr {
+    std::vector<std::unique_ptr<DeclExpr>> args;
+
+    std::string to_string() const {
+        std::string str = "(";
+        for (size_t i; i < args.size(); ++i) {
+            if (i != 0) str.append(", ");
+            str.append(args[i]->to_string());
+        }
+
+        return str;
+    }
+};
+
+struct LambdaExpr : Expr {
+    std::unique_ptr<Expr> signature;
+    std::unique_ptr<Expr> body;
+
+    std::string to_string() const override {
+        return "$" + signature->to_string() + "->" + body->to_string();
+    }
+    void accept(_Interpreter& backend) override;
+    LambdaExpr(std::unique_ptr<Expr> s, std::unique_ptr<Expr> b, size_t l, size_t c)
+        : signature(std::move(s)), body(std::move(b)) { line = l; column = c; }
+};
+
 struct FuncApplExpr : Expr {
     std::unique_ptr<Expr> func;
     std::vector<std::unique_ptr<Expr>> args;

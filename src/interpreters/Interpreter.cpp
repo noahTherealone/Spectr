@@ -359,6 +359,10 @@ void Interpreter::evalExpr(const OutExpr& expr) {
         setValue(nullptr);
 }
 
+void Interpreter::evalExpr(const LambdaExpr& expr) {
+    
+}
+
 void Interpreter::evalExpr(const FuncApplExpr& expr) {
     expr.func->accept(*this);
     if (!isFunc()) {

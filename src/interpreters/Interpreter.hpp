@@ -2,6 +2,7 @@
 
 #include "Expr.h"
 #include "Types.h"
+#include "Values.h"
 #include "PlaybackEvents.h"
 #include "LogSettings.h"
 #include <unordered_map>
@@ -72,6 +73,7 @@ public:
     virtual void evalExpr(const DeclExpr& expr) = 0;
     virtual void evalExpr(const BlockExpr& expr) = 0;
     virtual void evalExpr(const OutExpr& expr) = 0;
+    virtual void evalExpr(const LambdaExpr& expr) = 0;
     virtual void evalExpr(const FuncApplExpr& expr) = 0;
     virtual void evalExpr(const PlaybackExpr& expr) = 0;
     virtual void evalExpr(const ReleaseExpr& expr) = 0;
@@ -119,6 +121,7 @@ public:
     void evalExpr(const DeclExpr& expr) override;
     void evalExpr(const BlockExpr& expr) override;
     void evalExpr(const OutExpr& expr) override;
+    void evalExpr(const LambdaExpr& expr) override;
     void evalExpr(const FuncApplExpr& expr) override;
     void evalExpr(const PlaybackExpr& expr) override;
     void evalExpr(const ReleaseExpr& expr) override;
