@@ -64,11 +64,11 @@ public:
     virtual void visit(LambdaExpr& expr)     = 0;
 };
 
-struct Decl;
+struct VarDecl;
 
 struct IdentifierExpr : Expr {
     std::string name;
-    Decl* decl;
+    VarDecl* decl;
     std::string show() const override {
         return name;
     }

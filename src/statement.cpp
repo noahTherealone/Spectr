@@ -2,6 +2,7 @@
 #include "statement.hpp"
 #include "expression.hpp"
 #include "type_expression.hpp"
+#include "parser.hpp"
 
 std::string IfStmt::show() const {
     std::string s;
@@ -102,10 +103,15 @@ std::string VarDeclStmt::show() const {
     return s;
 }
 
-VarDeclStmt::VarDeclStmt(std::unique_ptr<IdentifierExpr> lhs, std::unique_ptr<TypeExpr> type, std::unique_ptr<Expr> value) :
-    Stmt(lhs->start(), value->start() - lhs->start() + value->length()),
-    lhs(std::move(lhs)), type(std::move(type)), value(std::move(value))/*,
-    decl(std::make_unique<VarDecl>(lhs->name, lhs->start(), value->start() - lhs->start() + value->length()))*/ {}
+VarDeclStmt::VarDeclStmt(std::unique_ptr<IdentifierExpr> lhs_, std::unique_ptr<TypeExpr> type_, std::unique_ptr<Expr> value_) :
+    Stmt(
+        lhs_->start(),
+        (value_ != nullptr ?
+            value_->start() - lhs_->start() + value_->length() :
+            type_->start() - lhs_->start() + type_->length()
+        )
+    ),
+    lhs(std::move(lhs_)), type(std::move(type_)), value(std::move(value_)) {}
 
 std::string ReferenceDeclStmt::show() const {        
     return stmtColor + "#&DCL: \033[0m" + lhs->show() + stmtColor + " &=\033[0m " + value->show();

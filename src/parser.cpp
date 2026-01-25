@@ -399,12 +399,6 @@ std::unique_ptr<TypeExpr> Parser::typeLed(std::unique_ptr<TypeExpr> left, const 
 #pragma region Statements
 
 std::unique_ptr<Stmt> Parser::matchExplicitVarDecl(std::unique_ptr<IdentifierExpr> lhs, const Token& typeMarker) {
-    auto id = dynamic_cast<IdentifierExpr*>(lhs.get());
-    if (!id)
-        throw SyntaxError("Needs identifiers for variable declarations", lhs->start(), lhs->length());
-    
-    auto idPtr = std::make_unique<IdentifierExpr>(*id);
-
     Token *typeStart = peek();
     auto type = parseTypeExpr();
 
@@ -414,7 +408,7 @@ std::unique_ptr<Stmt> Parser::matchExplicitVarDecl(std::unique_ptr<IdentifierExp
 
     Token *tok = next();
     if (!tok || tok->type == TokenType::LineBreak) {
-        return std::make_unique<VarDeclStmt>(std::move(idPtr), std::move(type), nullptr);
+        return std::make_unique<VarDeclStmt>(std::move(lhs), std::move(type), nullptr);
     }
     
     if (tok->type != TokenType::Assign) {
@@ -426,7 +420,7 @@ std::unique_ptr<Stmt> Parser::matchExplicitVarDecl(std::unique_ptr<IdentifierExp
         throw SyntaxError("Expected = after type marking", start, end - start);
     }
 
-    return matchVarDecl(std::move(idPtr), std::move(type), *tok);
+    return matchVarDecl(std::move(lhs), std::move(type), *tok);
 }
 
 std::unique_ptr<Stmt> Parser::matchInferredVarDecl(std::unique_ptr<IdentifierExpr> lhs, const Token& assignmentOp) {
@@ -450,8 +444,6 @@ std::unique_ptr<Stmt> Parser::matchAssignment(std::unique_ptr<Expr> lhs, const T
     std::string name;
     if (sgn.type == TokenType::Assign)
         name = "assignment";
-    else if (sgn.type == TokenType::TypeInferredAssign)
-        name = "type-inferred declaration";
     else if (sgn.type == TokenType::ReferenceAssign)
         name = "reference declaration";
     else
@@ -540,16 +532,26 @@ std::unique_ptr<Stmt> Parser::matchExpr() {
         return std::make_unique<ExprStmt>(std::move(expr));
 
     switch (tok->type) {
-        case TokenType::TypeMarker:
-            if (auto id = dynamic_cast<IdentifierExpr*>(expr.get()))
-                return matchExplicitVarDecl(std::unique_ptr<IdentifierExpr>(static_cast<IdentifierExpr*>(expr.release())), *tok);
+        /*case TokenType::TypeMarker:
+            if (auto id = dynamic_cast<IdentifierExpr*>(expr.get())) {
+                auto idPtr = std::unique_ptr<IdentifierExpr>(
+                    static_cast<IdentifierExpr*>(expr.release())
+                );
+
+                return matchExplicitVarDecl(std::move(idPtr), *tok);
+            }
             else
                 throw SyntaxError("lhs of explicit declaration must be an identifier", expr->start(), expr->length());
         case TokenType::TypeInferredAssign:
-            if (auto id = dynamic_cast<IdentifierExpr*>(expr.get()))
-                return matchInferredVarDecl(std::unique_ptr<IdentifierExpr>(static_cast<IdentifierExpr*>(expr.release())), *tok);
+            if (auto id = dynamic_cast<IdentifierExpr*>(expr.get())) {
+                auto idPtr = std::unique_ptr<IdentifierExpr>(
+                    static_cast<IdentifierExpr*>(expr.release())
+                );
+
+                return matchInferredVarDecl(std::move(idPtr), *tok);
+            }
             else
-                throw SyntaxError("lhs of inferred declaration must be an identifier", expr->start(), expr->length());
+                throw SyntaxError("lhs of inferred declaration must be an identifier", expr->start(), expr->length()); */
         case TokenType::Assign:
             return matchAssignment(std::move(expr), *tok);
         case TokenType::ReferenceAssign:
@@ -582,6 +584,25 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         next();
         auto expr = parseExpr();
         return std::make_unique<ReturnStmt>(std::move(expr), tok->index);
+    }
+    else if (tok->type == TokenType::Identifier) {
+        next();
+        if (!peek()) {
+            return std::make_unique<ExprStmt>(std::make_unique<IdentifierExpr>(*tok));
+        }
+
+        if (peek()->type == TokenType::TypeMarker) {
+            auto idPtr = std::make_unique<IdentifierExpr>(*tok);
+            return matchExplicitVarDecl(std::move(idPtr), *next());
+        }
+
+        if (peek()->type == TokenType::TypeInferredAssign) {
+            auto idPtr = std::make_unique<IdentifierExpr>(*tok);
+            return matchInferredVarDecl(std::move(idPtr), *next());
+        }
+
+        index--;
+        matchExpr();
     }
     else {
         return matchExpr();

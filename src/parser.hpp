@@ -13,7 +13,7 @@ struct SyntaxError : SpectrError {
 
 class Parser {
 private:
-    std::string path;
+    const std::string& path;
 
     std::vector<Token> tokens;
     std::vector<size_t> lineOffsets;

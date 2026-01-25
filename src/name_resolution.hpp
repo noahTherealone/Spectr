@@ -64,6 +64,8 @@ struct Context {
         return raw;
     }
 
+    Context() = default;
+
 private:
     std::vector<std::unique_ptr<Decl>> decls;
 };
@@ -131,13 +133,18 @@ class ExprVisitor;
 
 class NameResolver : public StmtVisitor, public ExprVisitor {
 public:
-    void resolveAST(const std::vector<std::unique_ptr<Stmt>>& ast, const std::string& path, const std::vector<size_t>& offsets);
+    void resolveAST(const std::vector<std::unique_ptr<Stmt>>& ast);
 
-    explicit NameResolver(Context& ctx) : ctx(ctx) { pushScope(); }
+    explicit NameResolver(Context& ctx, const std::string& path, const std::vector<size_t> offsets) :
+        ctx(ctx), path(path), offsets(offsets), currentScope(nullptr) { pushScope(); depth = 0; }
 
 private:
+    const std::string& path;
+    const std::vector<size_t>& offsets;
     Context& ctx;
+    std::vector<std::unique_ptr<Scope>> scopes;
     Scope* currentScope;
+    size_t depth;
 
     void pushScope();
     void popScope();
@@ -148,11 +155,13 @@ private:
         D* decl = ctx.makeDecl<D>(std::forward<Args>(args)...);
 
         if (currentScope->contains(name))
-            throw NameError("Variable redefinition", decl->start, decl->length);
+            throw NameError("Tried to redefine '" + name + "'", decl->start, decl->length);
         
         currentScope->bind(name, decl);
         return decl;
     }
+
+    void message(const std::string& msg) const;
 
     void visit(IfStmt& stmt) override;
     void visit(VarDeclStmt& stmt) override;
@@ -162,17 +171,17 @@ private:
     void visit(ReturnStmt& stmt) override;
     void visit(ExprStmt& stmt) override;
 
-    void visit(IdentifierExpr& stmt) override;
-    void visit(AttributeExpr& stmt) override;
-    void visit(VoidExpr& stmt) override;
-    void visit(BooleanExpr& stmt) override;
-    void visit(IntExpr& stmt) override;
-    void visit(NumExpr& stmt) override;
-    void visit(StrExpr& stmt) override;
-    void visit(BinaryExpr& stmt) override;
-    void visit(TernaryExpr& stmt) override;
-    void visit(TupleExpr& stmt) override;
-    void visit(BlockExpr& stmt) override;
-    void visit(ParamsExpr& stmt) override;
-    void visit(LambdaExpr& stmt) override;
+    void visit(IdentifierExpr& expr) override;
+    void visit(AttributeExpr& expr) override;
+    void visit(VoidExpr& expr) override;
+    void visit(BooleanExpr& expr) override;
+    void visit(IntExpr& expr) override;
+    void visit(NumExpr& expr) override;
+    void visit(StrExpr& expr) override;
+    void visit(BinaryExpr& expr) override;
+    void visit(TernaryExpr& expr) override;
+    void visit(TupleExpr& expr) override;
+    void visit(BlockExpr& expr) override;
+    void visit(ParamsExpr& expr) override;
+    void visit(LambdaExpr& expr) override;
 };
