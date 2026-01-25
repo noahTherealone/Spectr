@@ -1,0 +1,118 @@
+#[
+    Declare variables using
+    <name>: <type>
+    or
+    <name>: <type> = <value>
+    to assign a value right away. The type may be inferred automatically using
+    <name> := <value>
+
+    As a rule, every type must have a valid default value.
+
+    Variables can be made constant using the "const" keyword before declaration:
+    const <name>: <type> = <value>
+
+    Primitive types are:
+
+    void: Is always just "nil".
+    bool: Can be either "true" or "false"
+    int: Integer (assigned using literal with suffix "i")
+    num: Floating point number (assigned using literal)
+    str: String (literals in "-marks)
+
+    For types T, S, R, ..., compound types can be created using shorthands:
+
+    {T}            List type
+    (T, S, ...)    Tuple type
+    T|S|...        Union type
+    T?             Optional type - just shorthand for T|void
+    (T, S, ...)->R Function type mapping (T, S, ...) to R
+    (T, S, ...)->  Shorthand for function returning void
+    ->R            Function type without parameters
+    ->             Function type without parameters returning void
+
+    Functions can be written as lambda expressions:
+    (param1: T, param2: S) -> [...]
+    The type of lambda expressions can be inferred via the signature and type checking of all return values, of which the union may be taken if necessary.
+    Though an explicit definition will take precedence and possibly downcast the return type.
+    Constant functions can be defined using a macro:
+
+    fun functionName(param1: T, param2: S, ...) -> R [...]
+
+    This is semantically equivalent to:
+
+    const functionName: (T, S)->R = (param1: T, param2: S, ...) -> [...]
+
+    Additionally, the "fun" keyword allows for function overloading.
+
+    Functions always capture all variables in the surrounding scope by value by default. But it is possible to capture them by reference explicitly inside the parameter declaration -- this will not impact the function type, as they are not considered parameters.
+
+    counter := 0i
+    
+    fun increment(&counter) [ counter += 1i ] # increment: -> (empty function type)
+
+    Structs are supported using the "type" keyword. Inside them, any number of typed fields may be declared, possibly with default values, and optional public/private flags -- everything is public by default.
+
+    type person [
+        name: str = "default name"
+        age: int
+        private action: ->
+        fun doAction() [action()]
+    ]
+
+    They can by default be constructed using specialized syntax targeting only the desired fields.
+
+    myinstance := person{
+        age = 42
+    }
+
+    A type may inherit from another one:
+
+    type othertype : mytype [
+        fun doActionTwice() [
+            doAction() # othertype knows about mytype's public members
+            doAction()
+        ]
+    ]
+
+    It is possible to assign values of child types to variables of parent types.
+
+
+
+
+
+type A [
+    method: A @ () -> void
+    applicable: () -> void
+]
+
+myMethod: A @ () -> void = () -> [...]  #methods as templates, not directly callable
+a := A()
+a.method = myMethod
+a.method()                              #type error: Cannot call unbound method
+
+myApplicable: () -> void = a @ method   #binding method to instance
+a.applicable = myApplicable
+
+a.applicable()  #ok
+
+#possibly
+a->method()
+#as shorthand for
+(a @ a.method)()
+
+type B : A [
+    BMethod: B @ () -> void
+]
+
+b := B()
+b.BMethod = myMethod            #ok, (A @ () -> void) is considered a subtype of (B @ () -> void)
+b.applicable = b @ myMethod     #ok, because B is a subtype of A
+a.applicable = b @ a.method     #also ok, now a.applicable() will affect b
+
+myBMethod: B @ () -> void = () -> [...]
+
+b.BMethod = myBMethod           #ok
+a.method = myBMethod            #type error: (B @ () -> void) is not a subtype of (A @ () -> void)
+
+
+]#
