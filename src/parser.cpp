@@ -313,6 +313,10 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
                     throw SyntaxError("Unclosed parentheses in type expression", tokens[index-1].index + tokens[index-1].text.length(), 0);
                 }
 
+                if (peek()->type == TokenType::RParen) {
+                    break;
+                }
+
                 if (peek()->type != TokenType::Comma) {
                     throw SyntaxError("Unexpected token in type expression", peek()->index, peek()->text.length());
                 }
@@ -392,9 +396,9 @@ std::unique_ptr<TypeExpr> Parser::typeLed(std::unique_ptr<TypeExpr> left, const 
 
 #pragma endregion
 
-#pragma region Statement parsing
+#pragma region Statements
 
-std::unique_ptr<Stmt> Parser::matchVarDecl(std::unique_ptr<Expr> lhs, const Token& typeMarker) {
+std::unique_ptr<Stmt> Parser::matchExplicitVarDecl(std::unique_ptr<IdentifierExpr> lhs, const Token& typeMarker) {
     auto id = dynamic_cast<IdentifierExpr*>(lhs.get());
     if (!id)
         throw SyntaxError("Needs identifiers for variable declarations", lhs->start(), lhs->length());
@@ -422,16 +426,24 @@ std::unique_ptr<Stmt> Parser::matchVarDecl(std::unique_ptr<Expr> lhs, const Toke
         throw SyntaxError("Expected = after type marking", start, end - start);
     }
 
+    return matchVarDecl(std::move(idPtr), std::move(type), *tok);
+}
+
+std::unique_ptr<Stmt> Parser::matchInferredVarDecl(std::unique_ptr<IdentifierExpr> lhs, const Token& assignmentOp) {
+    return matchVarDecl(std::move(lhs), nullptr, assignmentOp);
+}
+
+std::unique_ptr<Stmt> Parser::matchVarDecl(std::unique_ptr<IdentifierExpr> lhs, std::unique_ptr<TypeExpr> type, const Token& assignmentOp) {
     auto value = parseExpr();
     if (!value)
-        throw SyntaxError("Expected expression for declaration", tok->index + tok->text.length(), 0);
+        throw SyntaxError("Expected expression for declaration", assignmentOp.index + assignmentOp.text.length(), 0);
 
-    tok = next();
+    Token* tok = next();
     if ((tok != nullptr) && tok->type != TokenType::LineBreak) {
         throw SyntaxError("Unexpected token after declaration statement", tok->index, tok->text.length());
     }
     
-    return std::make_unique<VarDeclStmt>(std::move(idPtr), std::move(type), std::move(value));
+    return std::make_unique<VarDeclStmt>(std::move(lhs), std::move(type), std::move(value));
 }
 
 std::unique_ptr<Stmt> Parser::matchAssignment(std::unique_ptr<Expr> lhs, const Token& sgn) {
@@ -457,8 +469,6 @@ std::unique_ptr<Stmt> Parser::matchAssignment(std::unique_ptr<Expr> lhs, const T
 
     if (sgn.type == TokenType::Assign)
         return std::make_unique<AssignmentStmt>(std::move(lhs), std::move(value));
-    else if (sgn.type == TokenType::TypeInferredAssign)
-        return std::make_unique<TypeInferredDeclStmt>(std::move(lhs), std::move(value));
     else
         return std::make_unique<ReferenceDeclStmt>(std::move(lhs), std::move(value));
 }
@@ -531,9 +541,15 @@ std::unique_ptr<Stmt> Parser::matchExpr() {
 
     switch (tok->type) {
         case TokenType::TypeMarker:
-            return matchVarDecl(std::move(expr), *tok);
+            if (auto id = dynamic_cast<IdentifierExpr*>(expr.get()))
+                return matchExplicitVarDecl(std::unique_ptr<IdentifierExpr>(static_cast<IdentifierExpr*>(expr.release())), *tok);
+            else
+                throw SyntaxError("lhs of explicit declaration must be an identifier", expr->start(), expr->length());
         case TokenType::TypeInferredAssign:
-            return matchAssignment(std::move(expr), *tok);
+            if (auto id = dynamic_cast<IdentifierExpr*>(expr.get()))
+                return matchInferredVarDecl(std::unique_ptr<IdentifierExpr>(static_cast<IdentifierExpr*>(expr.release())), *tok);
+            else
+                throw SyntaxError("lhs of inferred declaration must be an identifier", expr->start(), expr->length());
         case TokenType::Assign:
             return matchAssignment(std::move(expr), *tok);
         case TokenType::ReferenceAssign:
@@ -602,17 +618,8 @@ void Parser::skipLineBreaks() {
     while (peek() && peek()->type == TokenType::LineBreak) { next(); }
 }
 
-std::vector<std::unique_ptr<Stmt>> Parser::parseCode(const std::string& code) {
-    Lexer lexer = Lexer();
-    lexer.tokenize(code, tokens, lineOffsets);
-
-    std::cout << "\033[1m\033[95mTokenized code>\033[0m\n";
-    for (Token token : tokens)
-        std::cout << "\033[90m | \033[0m" + token.show() + (token.type == TokenType::LineBreak ? "\n" : "");
-    
-    std::cout << "\n";
-
-    std::cout << "\033[1m\033[94mParsed code>\033[0m\n";
+std::vector<std::unique_ptr<Stmt>> Parser::parse() {
+    index = 0;
 
     std::vector<std::unique_ptr<Stmt>> stmts;
     while (peek()) {
@@ -625,32 +632,21 @@ std::vector<std::unique_ptr<Stmt>> Parser::parseCode(const std::string& code) {
                 break;
             }
         }
-        catch (SyntaxError err) {
+        catch (const SyntaxError& err) {
             auto it = std::upper_bound(lineOffsets.begin(), lineOffsets.end(), err.start);
             size_t line = it - lineOffsets.begin() - 1;
             size_t column = err.start - lineOffsets[line];
-            std::cout << "\033[31mSyntaxError at (" + std::to_string(line+1) + ":" + std::to_string(column+1) + "): " + err.msg + "\033[0m\n";
+            std::cout << "\033[31mSyntaxError at " + path + " (" + std::to_string(line+1) + ":" + std::to_string(column+1) + "): " + err.msg + "\033[0m\n";
         }
     }
 
     return std::move(stmts);
 }
 
-std::vector<std::unique_ptr<Stmt>> Parser::parseFile(const std::string& path) {
-    std::ifstream file(path);
-
-    if (!file.is_open()) {
-        std::cerr << "\033[0;31mCould not open file '" << path << "'.\033[0m" << std::endl;
-        throw SpectrError("Could not open file '" + path + "'", 0, 0);
-    }
-
-    this->path = path;
-
-    std::stringstream buffer;
-    buffer << file.rdbuf();
-    std::string content = buffer.str();
-
-    return parseCode(content);
+std::vector<std::unique_ptr<Stmt>> Parser::parseToks(const std::vector<Token>& toks, const std::vector<size_t>& offsets) {
+    tokens = toks;
+    lineOffsets = offsets;
+    return parse();
 }
 
 #pragma endregion

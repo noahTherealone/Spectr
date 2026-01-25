@@ -4,7 +4,7 @@
 #include <memory>
 #include <charconv>
 #include "type.hpp"
-#include "name_resolution.hpp"
+//#include "name_resolution.hpp"
 
 const std::string exprColor = "\033[36m";
 
@@ -12,12 +12,16 @@ enum class TokenType;
 struct Token;
 struct SyntaxError;
 
+class ExprVisitor;
+
 struct Expr {
     virtual ~Expr() = default;
     virtual std::string show() const = 0;
 
     size_t start()  const { return start_; }
     size_t length() const { return length_; }
+
+    virtual void accept(class ExprVisitor& visitor) = 0;
 
 protected:
     size_t start_;
@@ -27,6 +31,41 @@ protected:
     Expr(const Token& tok) : Expr(tok.index, tok.text.length()) {}
 };
 
+struct IdentifierExpr;
+struct AttributeExpr;
+struct VoidExpr;
+struct BooleanExpr;
+struct IntExpr;
+struct NumExpr;
+struct StrExpr;
+struct BinaryExpr;
+struct TernaryExpr;
+struct TupleExpr;
+struct BlockExpr;
+struct ParamsExpr;
+struct LambdaExpr;
+
+class ExprVisitor {
+public:
+    virtual ~ExprVisitor() = default;
+
+    virtual void visit(IdentifierExpr& expr) = 0;
+    virtual void visit(AttributeExpr& expr)  = 0;
+    virtual void visit(VoidExpr& expr)       = 0;
+    virtual void visit(BooleanExpr& expr)    = 0;
+    virtual void visit(IntExpr& expr)        = 0;
+    virtual void visit(NumExpr& expr)        = 0;
+    virtual void visit(StrExpr& expr)        = 0;
+    virtual void visit(BinaryExpr& expr)     = 0;
+    virtual void visit(TernaryExpr& expr)    = 0;
+    virtual void visit(TupleExpr& expr)      = 0;
+    virtual void visit(BlockExpr& expr)      = 0;
+    virtual void visit(ParamsExpr& expr)     = 0;
+    virtual void visit(LambdaExpr& expr)     = 0;
+};
+
+struct Decl;
+
 struct IdentifierExpr : Expr {
     std::string name;
     Decl* decl;
@@ -34,6 +73,7 @@ struct IdentifierExpr : Expr {
         return name;
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     IdentifierExpr(const Token& tok) : Expr(tok), name(tok.text) {}
 };
 
@@ -44,6 +84,7 @@ struct AttributeExpr : Expr {
         return base->show() + "." + name;
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     AttributeExpr(std::unique_ptr<Expr> base, const Token& tok) :
         Expr(tok.index-1, tok.text.length()+1),
         base(std::move(base)) {}
@@ -56,6 +97,7 @@ struct VoidExpr : Expr {
         return "nil";
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     VoidExpr(const Token& tok) : Expr(tok) {}
     VoidExpr(size_t start, size_t length) : Expr(start, length) {}
 };
@@ -66,6 +108,7 @@ struct BooleanExpr : Expr {
         return value ? "true" : "false";
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     BooleanExpr(const Token& tok) : Expr(tok) {
         if (tok.type == TokenType::True)
             value = true;
@@ -82,6 +125,7 @@ struct IntExpr : Expr {
         return std::to_string(value) + "i";
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     IntExpr(const Token& tok) : Expr(tok) {
         std::string_view ss = tok.text.substr(0, tok.text.length() - 1);
         auto res = std::from_chars(ss.data(), ss.data() + ss.size(), value);
@@ -97,6 +141,7 @@ struct NumExpr : Expr {
         return std::to_string(value);
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     NumExpr(const Token& tok): Expr(tok) {
         auto res = std::from_chars(tok.text.data(), tok.text.data() + tok.text.size(), value);
         if (res.ec != std::errc{}) {
@@ -111,6 +156,7 @@ struct StrExpr : Expr {
         return "\"" + value + "\"";
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     StrExpr(const Token& tok) :
         Expr(tok.index, tok.text.length() + 2), // because quotation marks are missing from the token text
         value(tok.text) {}
@@ -152,6 +198,7 @@ struct BinaryExpr : Expr {
         return exprColor + "(\033[0m" + left->show() + exprColor + " " + showBinaryOp(op) + "\033[0m " + right->show() + exprColor + ")\033[0m";
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     BinaryExpr(std::unique_ptr<Expr> left, std::unique_ptr<Expr> right, const Token& tok) :
         Expr(left->start(), right->start() - left->start() + right->length()),
         op(binaryOpFromToken(tok.type)),
@@ -170,6 +217,7 @@ struct TernaryExpr : Expr {
         return exprColor + "(\033[0m" + primary->show() + exprColor + " if\033[0m " + condition->show() + exprColor + " else\033[0m " + alternative->show() + exprColor + ")\033[0m";
     }
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     TernaryExpr(std::unique_ptr<Expr> primary, std::unique_ptr<Expr> condition, std::unique_ptr<Expr> alternative) :
         Expr(primary->start(), alternative->start() - primary->start() + alternative->length()),
         primary(std::move(primary)),
@@ -181,6 +229,7 @@ struct TupleExpr : Expr {
     std::vector<std::unique_ptr<Expr>> exprns;
     std::string show() const override;
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     TupleExpr(std::vector<std::unique_ptr<Expr>> exprns, size_t start, size_t length) :
         Expr(start, length),
         exprns(std::move(exprns)) {}
@@ -192,22 +241,26 @@ struct BlockExpr : Expr {
     std::vector<std::unique_ptr<Stmt>> stmts;
     std::string show() const override;
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     BlockExpr(std::vector<std::unique_ptr<Stmt>> stmts, size_t start, size_t length) :
         Expr(start, length), stmts(std::move(stmts)) {}
     
     BlockExpr(std::unique_ptr<Stmt> stmt);
 };
 
+struct ParamDecl;
+
 struct ParamsExpr : Expr {
     std::vector<std::unique_ptr<ParamDecl>> decls;
     std::vector<std::pair<std::unique_ptr<IdentifierExpr>, std::unique_ptr<TypeExpr>>> params;
     std::string show() const override;
 
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     ParamsExpr(std::vector<std::pair<std::unique_ptr<IdentifierExpr>, std::unique_ptr<TypeExpr>>> params, size_t start, size_t length);
-    
     ParamsExpr(std::unique_ptr<TupleExpr> tuple);
-
     ParamsExpr(std::unique_ptr<IdentifierExpr> expr);
+
+    ~ParamsExpr();
 };
 
 struct LambdaExpr : Expr {
@@ -215,6 +268,6 @@ struct LambdaExpr : Expr {
     std::unique_ptr<BlockExpr> body;
     std::string show() const override;
 
-    LambdaExpr(std::unique_ptr<ParamsExpr> params, std::unique_ptr<BlockExpr> body) :
-        Expr(params->start(), body->start() - params->start() + body->length()), params(std::move(params)), body(std::move(body)) {}
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
+    LambdaExpr(std::unique_ptr<ParamsExpr> params, std::unique_ptr<BlockExpr> body);
 };

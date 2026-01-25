@@ -24,7 +24,9 @@ private:
 
     std::unique_ptr<Stmt> parseStatement();
 
-    std::unique_ptr<Stmt> matchVarDecl(std::unique_ptr<Expr> lhs, const Token& typeMarker);
+    std::unique_ptr<Stmt> matchExplicitVarDecl(std::unique_ptr<IdentifierExpr> lhs, const Token& typeMarker);
+    std::unique_ptr<Stmt> matchInferredVarDecl(std::unique_ptr<IdentifierExpr> lhs, const Token& assignmentOp);
+    std::unique_ptr<Stmt> matchVarDecl(std::unique_ptr<IdentifierExpr> lhs, std::unique_ptr<TypeExpr> type, const Token& assignmentOp);
     std::unique_ptr<Stmt> matchAssignment(std::unique_ptr<Expr> lhs, const Token& assignmentSign);
     std::unique_ptr<Stmt> matchIf();
     std::unique_ptr<Stmt> matchExpr();
@@ -49,7 +51,10 @@ private:
     void skipToLineBreak();
     void skipLineBreaks();
 
+    std::vector<std::unique_ptr<Stmt>> parse();
+
 public:
-    std::vector<std::unique_ptr<Stmt>> parseCode(const std::string& code);
-    std::vector<std::unique_ptr<Stmt>> parseFile(const std::string& path);
+    std::vector<std::unique_ptr<Stmt>> parseToks(const std::vector<Token>& toks, const std::vector<size_t>& offsets);
+
+    Parser(const std::string& path) : path(path) {}
 };

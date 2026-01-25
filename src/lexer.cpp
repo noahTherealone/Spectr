@@ -187,7 +187,7 @@ void Lexer::tokenize(const std::string& input, std::vector<Token>& tokens, std::
                 tokenizeSymbol();
                 
         } catch (LexerError err) {
-            std::cout << "LexerError at (" + std::to_string(err.start) + "): " + err.msg + "\n";
+            std::cout << "LexerError at " + path + "(" + std::to_string(err.start) + "): " + err.msg + "\n";
         }
     }
 }

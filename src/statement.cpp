@@ -90,25 +90,22 @@ IfStmt::IfStmt(IfChain cases, std::unique_ptr<BlockExpr> elseCase, size_t start,
     Stmt(start, length), cases(std::move(cases)), elseCase(std::move(elseCase)) {}
 
 std::string VarDeclStmt::show() const {
-    std::string s = stmtColor + "#DECL: \033[0m" + decl->name + stmtColor + ":\033[0m " + type->show();
+    std::string s = stmtColor + "#DECL: \033[0m" + lhs->name + stmtColor;
+    if (type)
+        s += ":\033[0m " + type->show() + stmtColor + " =\033[0m ";
+    else
+        s += stmtColor + " :=\033[0m ";
+    
     if (value)
-        s += stmtColor + " =\033[0m " + value->show();
+        s += value->show();
     
     return s;
 }
 
 VarDeclStmt::VarDeclStmt(std::unique_ptr<IdentifierExpr> lhs, std::unique_ptr<TypeExpr> type, std::unique_ptr<Expr> value) :
     Stmt(lhs->start(), value->start() - lhs->start() + value->length()),
-    lhs(std::move(lhs)), type(std::move(type)), value(std::move(value)),
-    decl(std::make_unique<VarDecl>(lhs->name, lhs->start(), value->start() - lhs->start() + value->length())) {}
-
-std::string TypeInferredDeclStmt::show() const {        
-    return stmtColor + "#TDCL: \033[0m" + lhs->show() + stmtColor + " :=\033[0m " + value->show();
-}
-
-TypeInferredDeclStmt::TypeInferredDeclStmt(std::unique_ptr<Expr> lhs, std::unique_ptr<Expr> value) :
-    Stmt(lhs->start(), value->start() - lhs->start() + value->length()),
-    lhs(std::move(lhs)), value(std::move(value)) {}
+    lhs(std::move(lhs)), type(std::move(type)), value(std::move(value))/*,
+    decl(std::make_unique<VarDecl>(lhs->name, lhs->start(), value->start() - lhs->start() + value->length()))*/ {}
 
 std::string ReferenceDeclStmt::show() const {        
     return stmtColor + "#&DCL: \033[0m" + lhs->show() + stmtColor + " &=\033[0m " + value->show();

@@ -212,9 +212,10 @@ struct Token {
 class Lexer {
 public:
     void tokenize(const std::string& input, std::vector<Token>& tokens, std::vector<size_t>& lineOffsets);
-    Lexer() = default;
+    Lexer(const std::string& path) : path(path) {};
 
 private:
+    std::string path;
     std::string code;
     std::vector<Token>* tokens;
     size_t index  = 0;

@@ -3,6 +3,7 @@
 #include "expression.hpp"
 #include "statement.hpp"
 #include "parser.hpp"
+#include "name_resolution.hpp"
 
 std::string TupleExpr::show() const {
     std::string s = exprColor + "(\033[0m";
@@ -78,6 +79,8 @@ ParamsExpr::ParamsExpr(std::unique_ptr<IdentifierExpr> expr) : Expr(expr->start(
     params.emplace_back(std::move(expr), nullptr);
 }
 
+ParamsExpr::~ParamsExpr() = default;
+
 std::string LambdaExpr::show() const {
     std::string s = "\n" + exprColor + "├─┬─lmbda: \033[0m" + params->show() + exprColor + " -> [\n";
     for (auto it = body->stmts.begin(); it != body->stmts.end(); ++it) {
@@ -88,3 +91,6 @@ std::string LambdaExpr::show() const {
 
     return s + exprColor + "└───]\033[0m";
 }
+
+LambdaExpr::LambdaExpr(std::unique_ptr<ParamsExpr> params, std::unique_ptr<BlockExpr> body) :
+    Expr(params->start(), body->start() - params->start() + body->length()), params(std::move(params)), body(std::move(body)) {}
