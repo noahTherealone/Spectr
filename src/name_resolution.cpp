@@ -67,24 +67,21 @@ void NameResolver::visit(VarDeclStmt& stmt) {
     message((shadows ? "~>" : "-> ") + decl->name);
 }
 
-void NameResolver::visit(ParamDeclStmt& stmt) {
-    // should probably not be used like that
-}
-
 void NameResolver::visit(ReferenceDeclStmt& stmt) {
 
 }
 
 void NameResolver::visit(AssignmentStmt& stmt) {
-
+    stmt.lhs->accept(*this);
+    stmt.value->accept(*this);
 }
 
-void NameResolver::visit(TypeDeclStmt& stmt) {
+void NameResolver::visit(AliasDeclStmt& stmt) {
 
 }
 
 void NameResolver::visit(ReturnStmt& stmt) {
-
+    stmt.value->accept(*this);
 }
 
 void NameResolver::visit(ExprStmt& stmt) {
@@ -161,7 +158,22 @@ void NameResolver::visit(ParamsExpr& expr) {
 }
 
 void NameResolver::visit(LambdaExpr& expr) {
+    pushScope();
+    for (auto& param : expr.params->params) {
+        Decl* shadow = currentScope->lookup(param->id->name);
+        VarDecl* decl = declare<VarDecl>(
+            param->id->name,
+            param->id->name,
+            param->id->start(),
+            param->id->length()
+        );
 
+        param->decl = decl;
+        message((shadow ? "~> " : "-> ") + param->id->name);
+    }
+    
+    resolveAST(expr.body->stmts);
+    popScope();
 }
 
 #pragma endregion

@@ -100,6 +100,7 @@ enum class TokenType {
     INTERFACE,
     IMPL,
     RETURN,
+    RECURSE,
 
 //  Assignment and typing (also affect statement shape)
 
@@ -133,7 +134,7 @@ constexpr std::array<TokenType, 15> binaryOps = {
 #undef X
 };
 
-constexpr std::array<std::pair<std::string_view, TokenType>, 17> keywords = {{
+constexpr std::array<std::pair<std::string_view, TokenType>, 18> keywords = {{
 #define X(kw, tok, lit, pt) {kw, TokenType::tok},
     PRIMITIVE_TYPES
 #undef X
@@ -148,7 +149,8 @@ constexpr std::array<std::pair<std::string_view, TokenType>, 17> keywords = {{
     {"type",      TokenType::TYPE},
     {"interface", TokenType::INTERFACE},
     {"impl",      TokenType::IMPL},
-    {"return",    TokenType::RETURN}
+    {"return",    TokenType::RETURN},
+    {"rec",       TokenType::RECURSE}
 }};
 
 constexpr TokenType wordToTokenType(std::string_view s) {

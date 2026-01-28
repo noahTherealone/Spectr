@@ -578,11 +578,12 @@ std::unique_ptr<Stmt> Parser::matchExpr() {
 
 std::unique_ptr<Stmt> Parser::parseStatement() {
 
-    while (peek()->type == TokenType::LineBreak) {
+    while (peek() && peek()->type == TokenType::LineBreak) {
         if (!next()) return nullptr;
     }
 
     Token *tok = peek();
+    if (!tok) return nullptr;
     if (tok->type == TokenType::IF) {
         return matchIf();
     }
@@ -590,6 +591,21 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         next();
         auto expr = parseExpr();
         return std::make_unique<ReturnStmt>(std::move(expr), tok->index);
+    }
+    else if (tok->type == TokenType::TYPE) {
+        next();
+        if (!peek())
+            throw SyntaxError("Expected type name", tokens.back().index + tokens.back().text.length(), 0);
+        if (peek()->type != TokenType::Identifier)
+            throw SyntaxError("Expected type name", tok->index, tok->text.length());
+        
+        auto id = std::make_unique<IdentifierExpr>(*next());
+        expect(TokenType::Assign);
+        auto value = parseTypeExpr();
+        if (peek() && peek()->type != TokenType::LineBreak)
+            throw SyntaxError("Unexpected tokens after type alias", 0, 0);
+        
+        return std::make_unique<AliasDeclStmt>(std::move(id), std::move(value));
     }
     else if (tok->type == TokenType::Identifier) {
         next();
@@ -608,7 +624,7 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         }
 
         index--;
-        matchExpr();
+        return matchExpr();
     }
     else {
         return matchExpr();

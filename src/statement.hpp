@@ -33,10 +33,9 @@ protected:
 
 struct IfStmt;
 struct VarDeclStmt;
-struct ParamDeclStmt;
 struct ReferenceDeclStmt;
 struct AssignmentStmt;
-struct TypeDeclStmt;
+struct AliasDeclStmt;
 struct ReturnStmt;
 struct ExprStmt;
 
@@ -46,10 +45,9 @@ public:
 
     virtual void visit(IfStmt& stmt) = 0;
     virtual void visit(VarDeclStmt& stmt) = 0;
-    virtual void visit(ParamDeclStmt& stmt) = 0;
     virtual void visit(ReferenceDeclStmt& stmt) = 0;
     virtual void visit(AssignmentStmt& stmt) = 0;
-    virtual void visit(TypeDeclStmt& stmt) = 0;
+    virtual void visit(AliasDeclStmt& stmt) = 0;
     virtual void visit(ReturnStmt& stmt) = 0;
     virtual void visit(ExprStmt& stmt) = 0;
 };
@@ -95,10 +93,13 @@ struct AssignmentStmt : Stmt {
     AssignmentStmt(std::unique_ptr<Expr> lhs, std::unique_ptr<Expr> value);
 };
 
-struct TypeDeclStmt : Stmt {
-    std::string* name;
+struct AliasDeclStmt : Stmt {
+    std::unique_ptr<IdentifierExpr> name;
+    std::unique_ptr<TypeExpr> value;
+    std::string show() const override;
 
     void accept(class StmtVisitor& visitor) { visitor.visit(*this); }
+    AliasDeclStmt(std::unique_ptr<IdentifierExpr> name, std::unique_ptr<TypeExpr> value);
 };
 
 struct ReturnStmt : Stmt {

@@ -104,7 +104,7 @@ struct VarDeclStmt;
 struct TypeInferredDeclStmt;
 struct ReferenceDeclStmt;
 struct AssignmentStmt;
-struct TypeDeclStmt;
+struct AliasDeclStmt;
 struct ReturnStmt;
 struct ExprStmt;
 
@@ -129,7 +129,7 @@ class NameResolver : public StmtVisitor, public ExprVisitor {
 public:
     void resolveAST(const std::vector<std::unique_ptr<Stmt>>& ast);
 
-    explicit NameResolver(Context& ctx, const std::string& path, const std::vector<size_t> offsets) :
+    explicit NameResolver(Context& ctx, const std::string& path, const std::vector<size_t>& offsets) :
         ctx(ctx), path(path), offsets(offsets), currentScope(nullptr) { pushScope(); depth = 0; }
 
 private:
@@ -159,10 +159,9 @@ private:
 
     void visit(IfStmt& stmt) override;
     void visit(VarDeclStmt& stmt) override;
-    void visit(ParamDeclStmt& stmt) override;
     void visit(ReferenceDeclStmt& stmt) override;
     void visit(AssignmentStmt& stmt) override;
-    void visit(TypeDeclStmt& stmt) override;
+    void visit(AliasDeclStmt& stmt) override;
     void visit(ReturnStmt& stmt) override;
     void visit(ExprStmt& stmt) override;
 
