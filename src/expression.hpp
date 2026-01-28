@@ -229,6 +229,10 @@ struct TupleExpr : Expr {
     std::vector<std::unique_ptr<Expr>> exprns;
     std::string show() const override;
 
+    std::vector<std::unique_ptr<Expr>> takeExprns() {
+        return std::move(exprns);
+    }
+
     void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
     TupleExpr(std::vector<std::unique_ptr<Expr>> exprns, size_t start, size_t length) :
         Expr(start, length),
@@ -248,7 +252,7 @@ struct BlockExpr : Expr {
     BlockExpr(std::unique_ptr<Stmt> stmt);
 };
 
-struct ParamDecl;
+/*struct ParamDecl;
 
 struct ParamsExpr : Expr {
     std::vector<std::unique_ptr<ParamDecl>> decls;
@@ -261,13 +265,37 @@ struct ParamsExpr : Expr {
     ParamsExpr(std::unique_ptr<IdentifierExpr> expr);
 
     ~ParamsExpr();
+};*/
+
+struct ParamDecl;
+
+struct Param {
+    VarDecl* decl;
+    std::unique_ptr<IdentifierExpr> id;
+    std::unique_ptr<TypeExpr> type;
+
+    Param(std::unique_ptr<IdentifierExpr> id, std::unique_ptr<TypeExpr> type) :
+        id(std::move(id)), type(std::move(type)) {}
+};
+
+struct Params {
+    size_t start;
+    size_t length;
+    std::vector<std::unique_ptr<Param>> params;
+
+    Params() = default;
+    Params(std::unique_ptr<TupleExpr> tuple);
+    Params(std::unique_ptr<IdentifierExpr> id);
+    Params(std::unique_ptr<Expr> expr);
 };
 
 struct LambdaExpr : Expr {
-    std::unique_ptr<ParamsExpr> params;
+    //std::unique_ptr<ParamsExpr> params;
+    std::unique_ptr<Params> params;
     std::unique_ptr<BlockExpr> body;
     std::string show() const override;
 
     void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
-    LambdaExpr(std::unique_ptr<ParamsExpr> params, std::unique_ptr<BlockExpr> body);
+    LambdaExpr(std::unique_ptr<Params> params, std::unique_ptr<BlockExpr> body);
+    LambdaExpr(std::unique_ptr<TupleExpr> params, std::unique_ptr<BlockExpr> body);
 };

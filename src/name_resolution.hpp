@@ -26,12 +26,6 @@ struct VarDecl : Decl {
     VarDecl(const std::string& name, size_t start, size_t length) : Decl(name, start, length) {}
 };
 
-struct ParamDecl : Decl {
-    TypePtr type;
-
-    ParamDecl(const std::string& name, size_t start, size_t length) : Decl(name, start, length) {}
-};
-
 struct FunDecl : Decl {
 
 };
@@ -165,6 +159,7 @@ private:
 
     void visit(IfStmt& stmt) override;
     void visit(VarDeclStmt& stmt) override;
+    void visit(ParamDeclStmt& stmt) override;
     void visit(ReferenceDeclStmt& stmt) override;
     void visit(AssignmentStmt& stmt) override;
     void visit(TypeDeclStmt& stmt) override;

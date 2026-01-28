@@ -33,6 +33,7 @@ protected:
 
 struct IfStmt;
 struct VarDeclStmt;
+struct ParamDeclStmt;
 struct ReferenceDeclStmt;
 struct AssignmentStmt;
 struct TypeDeclStmt;
@@ -45,6 +46,7 @@ public:
 
     virtual void visit(IfStmt& stmt) = 0;
     virtual void visit(VarDeclStmt& stmt) = 0;
+    virtual void visit(ParamDeclStmt& stmt) = 0;
     virtual void visit(ReferenceDeclStmt& stmt) = 0;
     virtual void visit(AssignmentStmt& stmt) = 0;
     virtual void visit(TypeDeclStmt& stmt) = 0;

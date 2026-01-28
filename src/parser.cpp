@@ -79,7 +79,7 @@ std::unique_ptr<Expr> Parser::nud(const Token& tok) {
 std::unique_ptr<Expr> Parser::led(std::unique_ptr<Expr> left, const Token& tok) {
     if (std::find(binaryOps.begin(), binaryOps.end(), tok.type) != binaryOps.end()) {
         if (tok.type == TokenType::RightArrow)
-            return parseLambda(std::move(left));
+            return parseLambda(std::make_unique<Params>(std::move(left)));
         
         auto right = parseExpr(rbp(tok));
         if (!right)
@@ -109,13 +109,13 @@ std::unique_ptr<Expr> Parser::led(std::unique_ptr<Expr> left, const Token& tok) 
     throw SyntaxError("Unexpected token inside expression", tok.index, tok.text.length());
 }
 
-std::unique_ptr<Expr> Parser::parseLambda(std::unique_ptr<Expr> left) {
+std::unique_ptr<LambdaExpr> Parser::parseLambda(std::unique_ptr<Params> params) {
     if (!peek())
         throw SyntaxError("Expected lambda body", tokens.back().index + tokens.back().text.length(), 0);
 
-    std::unique_ptr<ParamsExpr> params;
+    //std::unique_ptr<ParamsExpr> params;
     
-    if (auto p = dynamic_cast<ParamsExpr*>(left.get())) {
+    /*if (auto p = dynamic_cast<ParamsExpr*>(left.get())) {
         params.reset(static_cast<ParamsExpr*>(left.release()));
     }
     else if (auto tuple = dynamic_cast<TupleExpr*>(left.get())) {
@@ -129,7 +129,7 @@ std::unique_ptr<Expr> Parser::parseLambda(std::unique_ptr<Expr> left) {
         );
     }
     else
-        throw SyntaxError("Invalid parameter expression", left->start(), left->length());
+        throw SyntaxError("Invalid parameter expression", left->start(), left->length());*/
 
     if (peek()->type == TokenType::LBracket) {
         auto body = parseBlock(next()->index);
@@ -215,8 +215,8 @@ std::unique_ptr<Expr> Parser::parseParen(size_t start) {
     }
 }
 
-std::unique_ptr<Expr> Parser::parseParams(size_t start) {
-    std::vector<std::pair<std::unique_ptr<IdentifierExpr>, std::unique_ptr<TypeExpr>>> params;
+std::unique_ptr<LambdaExpr> Parser::parseParams(size_t start) {
+    auto params = std::make_unique<Params>();
     while (true) {
         Token& nameTok = expect(TokenType::Identifier);
         std::unique_ptr<IdentifierExpr> name = std::make_unique<IdentifierExpr>(nameTok);
@@ -226,13 +226,19 @@ std::unique_ptr<Expr> Parser::parseParams(size_t start) {
 
         expect(TokenType::TypeMarker);
         auto type = parseTypeExpr();
-        params.emplace_back(std::move(name), std::move(type));
+        params->params.push_back(std::make_unique<Param>(std::move(name), std::move(type)));
         if (!peek()) {
             throw SyntaxError("Unclosed params", tokens.back().index + tokens.back().text.length(), 0);
         }
 
         if (peek()->type == TokenType::RParen) {
-            return std::make_unique<ParamsExpr>(std::move(params), start, peek()->index - start + next()->text.length());
+            params->start = start;
+            params->length = peek()->index - start + next()->text.length();
+            if (!peek() || peek()->type != TokenType::RightArrow)
+                throw SyntaxError("Expected -> symbol", peek()->index, peek()->text.length());
+            
+            next();
+            return parseLambda(std::move(params));
         }
 
         expect(TokenType::Comma);

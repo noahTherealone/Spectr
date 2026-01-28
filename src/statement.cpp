@@ -1,4 +1,5 @@
 #include <regex>
+#include <iostream>
 #include "statement.hpp"
 #include "expression.hpp"
 #include "type_expression.hpp"
@@ -93,7 +94,7 @@ IfStmt::IfStmt(IfChain cases, std::unique_ptr<BlockExpr> elseCase, size_t start,
 std::string VarDeclStmt::show() const {
     std::string s = stmtColor + "#DECL: \033[0m" + lhs->name + stmtColor;
     if (type)
-        s += ":\033[0m " + type->show() + stmtColor + " =\033[0m ";
+        s += ":\033[0m " + type->show() + (value ? stmtColor + " =\033[0m " : "");
     else
         s += stmtColor + " :=\033[0m ";
     
@@ -111,7 +112,9 @@ VarDeclStmt::VarDeclStmt(std::unique_ptr<IdentifierExpr> lhs_, std::unique_ptr<T
             type_->start() - lhs_->start() + type_->length()
         )
     ),
-    lhs(std::move(lhs_)), type(std::move(type_)), value(std::move(value_)) {}
+    lhs(std::move(lhs_)), type(std::move(type_)), value(std::move(value_)) {
+        if (!type && !value) std::cout << "what the hell\n";
+    }
 
 std::string ReferenceDeclStmt::show() const {        
     return stmtColor + "#&DCL: \033[0m" + lhs->show() + stmtColor + " &=\033[0m " + value->show();

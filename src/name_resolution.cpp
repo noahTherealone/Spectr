@@ -59,10 +59,16 @@ void NameResolver::visit(VarDeclStmt& stmt) {
         stmt.lhs->name,
         stmt.lhs->name,
         stmt.lhs->start(),
-        stmt.value->start() - stmt.lhs->start() + stmt.value->length()
+        stmt.value
+            ? stmt.value->start() - stmt.lhs->start() + stmt.value->length()
+            : stmt.type->start()  - stmt.lhs->start() + stmt.type->length()
     );
 
     message((shadows ? "~>" : "-> ") + decl->name);
+}
+
+void NameResolver::visit(ParamDeclStmt& stmt) {
+    // should probably not be used like that
 }
 
 void NameResolver::visit(ReferenceDeclStmt& stmt) {

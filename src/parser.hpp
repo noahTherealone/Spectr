@@ -38,8 +38,8 @@ private:
     std::unique_ptr<Expr> led(std::unique_ptr<Expr> left, const Token& tok);
 
     std::unique_ptr<Expr> parseParen(size_t start);
-    std::unique_ptr<Expr> parseParams(size_t start);
-    std::unique_ptr<Expr> parseLambda(std::unique_ptr<Expr> left);
+    std::unique_ptr<LambdaExpr> parseParams(size_t start);
+    std::unique_ptr<LambdaExpr> parseLambda(std::unique_ptr<Params> params);
     std::unique_ptr<BlockExpr> parseBlock(size_t start);
 
     std::unique_ptr<TypeExpr> parseTypeExpr() { return parseTypeExpr(0); }
