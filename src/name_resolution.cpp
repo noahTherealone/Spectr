@@ -3,6 +3,7 @@
 #include <assert.h>
 #include "name_resolution.hpp"
 #include "expression.hpp"
+#include "type_expression.hpp"
 
 void NameResolver::pushScope() {
     scopes.push_back(std::make_unique<Scope>(currentScope));
@@ -49,11 +50,18 @@ void NameResolver::visit(IfStmt& stmt) {
 }
 
 void NameResolver::visit(VarDeclStmt& stmt) {
+    if (stmt.type) {
+        stmt.type->accept(*this);
+    }
+
     if (stmt.value) {
         stmt.value->accept(*this);
     }
 
-    bool shadows = currentScope->lookup(stmt.lhs->name);
+    Decl* shadows = currentScope->lookup(stmt.lhs->name);
+    if (shadows && dynamic_cast<TypeDecl*>(shadows)) {
+        throw NameError("Cannot shadow type name '" + stmt.lhs->name + "'", stmt.start(), stmt.length());
+    }
 
     VarDecl* decl = declare<VarDecl>(
         stmt.lhs->name,
@@ -77,7 +85,19 @@ void NameResolver::visit(AssignmentStmt& stmt) {
 }
 
 void NameResolver::visit(AliasDeclStmt& stmt) {
+    stmt.value->accept(*this);
+    
+    if (currentScope->lookup(stmt.name->name))
+        throw NameError("Type names may not shadow declared name '" + stmt.name->name + "'", stmt.start(), stmt.length());
+    
+    TypeDecl* decl = declare<TypeDecl>(
+        stmt.name->name,
+        stmt.name->name,
+        stmt.name->start(),
+        stmt.value->start() - stmt.name->start() + stmt.value->length()
+    );
 
+    message(primTypeColor + "-> " + decl->name + "\033[0m");
 }
 
 void NameResolver::visit(ReturnStmt& stmt) {
@@ -174,6 +194,49 @@ void NameResolver::visit(LambdaExpr& expr) {
     
     resolveAST(expr.body->stmts);
     popScope();
+}
+
+#pragma endregion
+
+#pragma region Type expression visitors
+
+void NameResolver::visit(PrimTypeExpr& expr) {
+
+}
+
+void NameResolver::visit(NamedTypeExpr& expr) {
+    Decl* decl = currentScope->lookup(expr.name);
+    if (!decl)
+        throw NameError("Undeclared type name '" + expr.name + "'", expr.start(), expr.length());
+    
+    if (auto typeDecl = dynamic_cast<TypeDecl*>(decl)) {
+        expr.decl = typeDecl;
+        message(primTypeColor + " - " + typeDecl->name + "\033[0m");
+    }
+    else {
+        throw NameError("Identifier '" + expr.name + "' is not type name", expr.start(), expr.length());
+    }
+}
+
+void NameResolver::visit(ListTypeExpr& expr) {
+    expr.type->accept(*this);
+}
+
+void NameResolver::visit(TupleTypeExpr& expr) {
+    for (auto& type : expr.types)
+        type->accept(*this);
+}
+
+void NameResolver::visit(OptionTypeExpr& expr) {
+    for (auto& option : expr.options)
+        option->accept(*this);
+}
+
+void NameResolver::visit(FunctionTypeExpr& expr) {
+    for (auto& param : expr.params)
+        param->accept(*this);
+    
+    expr.out->accept(*this);
 }
 
 #pragma endregion

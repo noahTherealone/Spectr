@@ -6,3 +6,5 @@ add: (int, int) -> int = (a, b) -> [
 ]
 
 type T = int
+
+obj: {bool|T}

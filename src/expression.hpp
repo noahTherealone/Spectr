@@ -252,23 +252,6 @@ struct BlockExpr : Expr {
     BlockExpr(std::unique_ptr<Stmt> stmt);
 };
 
-/*struct ParamDecl;
-
-struct ParamsExpr : Expr {
-    std::vector<std::unique_ptr<ParamDecl>> decls;
-    std::vector<std::pair<std::unique_ptr<IdentifierExpr>, std::unique_ptr<TypeExpr>>> params;
-    std::string show() const override;
-
-    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
-    ParamsExpr(std::vector<std::pair<std::unique_ptr<IdentifierExpr>, std::unique_ptr<TypeExpr>>> params, size_t start, size_t length);
-    ParamsExpr(std::unique_ptr<TupleExpr> tuple);
-    ParamsExpr(std::unique_ptr<IdentifierExpr> expr);
-
-    ~ParamsExpr();
-};*/
-
-struct ParamDecl;
-
 struct Param {
     VarDecl* decl;
     std::unique_ptr<IdentifierExpr> id;
@@ -290,7 +273,6 @@ struct Params {
 };
 
 struct LambdaExpr : Expr {
-    //std::unique_ptr<ParamsExpr> params;
     std::unique_ptr<Params> params;
     std::unique_ptr<BlockExpr> body;
     std::string show() const override;

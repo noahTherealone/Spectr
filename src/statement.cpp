@@ -141,7 +141,7 @@ std::string AliasDeclStmt::show() const {
     return stmtColor + "#TYPE: \033[0m" + name->show() + stmtColor + " = " + value->show() + "\033[0m";
 }
 
-AliasDeclStmt::AliasDeclStmt(std::unique_ptr<IdentifierExpr> name, std::unique_ptr<TypeExpr> value) :
+AliasDeclStmt::AliasDeclStmt(std::unique_ptr<NamedTypeExpr> name, std::unique_ptr<TypeExpr> value) :
     Stmt(name->start(), value->start() - name->length() + value->length()), name(std::move(name)), value(std::move(value)) {}
 
 ReturnStmt::ReturnStmt(std::unique_ptr<Expr> value, size_t start) :

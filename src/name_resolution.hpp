@@ -124,8 +124,9 @@ struct LambdaExpr;
 
 class StmtVisitor;
 class ExprVisitor;
+class TypeExprVisitor;
 
-class NameResolver : public StmtVisitor, public ExprVisitor {
+class NameResolver : public StmtVisitor, public ExprVisitor, public TypeExprVisitor {
 public:
     void resolveAST(const std::vector<std::unique_ptr<Stmt>>& ast);
 
@@ -178,4 +179,11 @@ private:
     void visit(BlockExpr& expr) override;
     void visit(ParamsExpr& expr) override;
     void visit(LambdaExpr& expr) override;
+
+    void visit(PrimTypeExpr& expr) override;
+    void visit(NamedTypeExpr& expr) override;
+    void visit(ListTypeExpr& expr) override;
+    void visit(TupleTypeExpr& expr) override;
+    void visit(OptionTypeExpr& expr) override;
+    void visit(FunctionTypeExpr& expr) override;
 };

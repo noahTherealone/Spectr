@@ -301,6 +301,9 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
         return std::make_unique<PrimTypeExpr>(tok);
     
     switch (tok.type) {
+        case TokenType::Identifier: {
+            return std::make_unique<NamedTypeExpr>(tok);
+        }
         case TokenType::LParen: {
             auto type = parseTypeExpr();
             if (!peek()) {
@@ -599,7 +602,7 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
         if (peek()->type != TokenType::Identifier)
             throw SyntaxError("Expected type name", tok->index, tok->text.length());
         
-        auto id = std::make_unique<IdentifierExpr>(*next());
+        auto id = std::make_unique<NamedTypeExpr>(*next());
         expect(TokenType::Assign);
         auto value = parseTypeExpr();
         if (peek() && peek()->type != TokenType::LineBreak)

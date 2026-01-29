@@ -8,8 +8,9 @@
 
 struct Expr;
 struct IdentifierExpr;
-struct TypeExpr;
 struct BlockExpr;
+struct TypeExpr;
+struct NamedTypeExpr;
 
 const std::string stmtColor = "\033[94m";
 
@@ -94,12 +95,12 @@ struct AssignmentStmt : Stmt {
 };
 
 struct AliasDeclStmt : Stmt {
-    std::unique_ptr<IdentifierExpr> name;
+    std::unique_ptr<NamedTypeExpr> name;
     std::unique_ptr<TypeExpr> value;
     std::string show() const override;
 
     void accept(class StmtVisitor& visitor) { visitor.visit(*this); }
-    AliasDeclStmt(std::unique_ptr<IdentifierExpr> name, std::unique_ptr<TypeExpr> value);
+    AliasDeclStmt(std::unique_ptr<NamedTypeExpr> name, std::unique_ptr<TypeExpr> value);
 };
 
 struct ReturnStmt : Stmt {
