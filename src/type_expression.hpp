@@ -52,7 +52,7 @@ struct NamedTypeExpr;
 struct ListTypeExpr;
 struct TupleTypeExpr;
 struct OptionTypeExpr;
-struct FunctionTypeExpr;
+struct LambdaTypeExpr;
 
 class TypeExprVisitor {
 public:
@@ -63,7 +63,7 @@ public:
     virtual void visit(ListTypeExpr& expr)     = 0;
     virtual void visit(TupleTypeExpr& expr)    = 0;
     virtual void visit(OptionTypeExpr& expr)   = 0;
-    virtual void visit(FunctionTypeExpr& expr) = 0;
+    virtual void visit(LambdaTypeExpr& expr) = 0;
 };
 
 struct PrimTypeExpr : TypeExpr {
@@ -127,7 +127,7 @@ struct OptionTypeExpr : TypeExpr {
         options(std::move(options)) {}
 };
 
-struct FunctionTypeExpr : TypeExpr {
+struct LambdaTypeExpr : TypeExpr {
     std::vector<std::unique_ptr<TypeExpr>> params;
     std::unique_ptr<TypeExpr> out;
     std::string show() const override {
@@ -141,7 +141,7 @@ struct FunctionTypeExpr : TypeExpr {
 
     void accept(class TypeExprVisitor& visitor) { visitor.visit(*this); }
 
-    FunctionTypeExpr(std::vector<std::unique_ptr<TypeExpr>> params, std::unique_ptr<TypeExpr> out, size_t start) :
+    LambdaTypeExpr(std::vector<std::unique_ptr<TypeExpr>> params, std::unique_ptr<TypeExpr> out, size_t start) :
         TypeExpr(start, out->start() - start + out->length()),
         params(std::move(params)), out(std::move(out)) {}
 };

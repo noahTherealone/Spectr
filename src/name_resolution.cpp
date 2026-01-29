@@ -45,7 +45,12 @@ void NameResolver::message(const std::string& msg) const {
 
 void NameResolver::visit(IfStmt& stmt) {
     for (auto& c : stmt.cases) {
-        
+        c.first->accept(*this);
+        c.second->accept(*this);
+    }
+
+    if (stmt.elseCase) {
+        stmt.elseCase->accept(*this);
     }
 }
 
@@ -127,7 +132,7 @@ void NameResolver::visit(IdentifierExpr& expr) {
 }
 
 void NameResolver::visit(AttributeExpr& expr) {
-
+    expr.base->accept(*this);
 }
 
 void NameResolver::visit(VoidExpr& expr) {
@@ -156,9 +161,15 @@ void NameResolver::visit(BinaryExpr& expr) {
 }
 
 void NameResolver::visit(TernaryExpr& expr) {
-    expr.primary->accept(*this);
     expr.condition->accept(*this);
+    expr.primary->accept(*this);
     expr.alternative->accept(*this);
+}
+
+void NameResolver::visit(ListExpr& expr) {
+    for (auto& elem : expr.exprns) {
+        elem->accept(*this);
+    }
 }
 
 void NameResolver::visit(TupleExpr& expr) {
@@ -171,10 +182,6 @@ void NameResolver::visit(BlockExpr& expr) {
     pushScope();
     resolveAST(expr.stmts);
     popScope();
-}
-
-void NameResolver::visit(ParamsExpr& expr) {
-
 }
 
 void NameResolver::visit(LambdaExpr& expr) {
@@ -232,7 +239,7 @@ void NameResolver::visit(OptionTypeExpr& expr) {
         option->accept(*this);
 }
 
-void NameResolver::visit(FunctionTypeExpr& expr) {
+void NameResolver::visit(LambdaTypeExpr& expr) {
     for (auto& param : expr.params)
         param->accept(*this);
     

@@ -1,10 +1,11 @@
-b: int = 4
-a := b
 
 add: (int, int) -> int = (a, b) -> [
     return a + b
 ]
 
-type T = int
+tuple: (int,) -> int
 
-obj: {bool|T}
+type T = int
+x: T = 5
+obj: ({bool|T}, T) = {5, true, x}
+

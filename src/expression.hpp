@@ -40,9 +40,9 @@ struct NumExpr;
 struct StrExpr;
 struct BinaryExpr;
 struct TernaryExpr;
+struct ListExpr;
 struct TupleExpr;
 struct BlockExpr;
-struct ParamsExpr;
 struct LambdaExpr;
 
 class ExprVisitor {
@@ -58,9 +58,9 @@ public:
     virtual void visit(StrExpr& expr)        = 0;
     virtual void visit(BinaryExpr& expr)     = 0;
     virtual void visit(TernaryExpr& expr)    = 0;
+    virtual void visit(ListExpr& expr)       = 0;
     virtual void visit(TupleExpr& expr)      = 0;
     virtual void visit(BlockExpr& expr)      = 0;
-    virtual void visit(ParamsExpr& expr)     = 0;
     virtual void visit(LambdaExpr& expr)     = 0;
 };
 
@@ -223,6 +223,20 @@ struct TernaryExpr : Expr {
         primary(std::move(primary)),
         condition(std::move(condition)),
         alternative(std::move(alternative)) {}
+};
+
+struct ListExpr : Expr {
+    std::vector<std::unique_ptr<Expr>> exprns;
+    std::string show() const override;
+
+    std::vector<std::unique_ptr<Expr>> takeExprns() {
+        return std::move(exprns);
+    }
+
+    void accept(ExprVisitor& visitor) override { visitor.visit(*this); }
+    ListExpr(std::vector<std::unique_ptr<Expr>> exprns, size_t start, size_t length) :
+        Expr(start, length),
+        exprns(std::move(exprns)) {}
 };
 
 struct TupleExpr : Expr {

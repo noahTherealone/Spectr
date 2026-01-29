@@ -69,6 +69,8 @@ std::unique_ptr<Expr> Parser::nud(const Token& tok) {
             return std::make_unique<StrExpr>(tok);
         case TokenType::LParen:
             return parseParen(tok.index);
+        case TokenType::LBrace:
+            return parseList(tok.index);
         case TokenType::LBracket:
             return parseBlock(tok.index);
         default:
@@ -112,24 +114,6 @@ std::unique_ptr<Expr> Parser::led(std::unique_ptr<Expr> left, const Token& tok) 
 std::unique_ptr<LambdaExpr> Parser::parseLambda(std::unique_ptr<Params> params) {
     if (!peek())
         throw SyntaxError("Expected lambda body", tokens.back().index + tokens.back().text.length(), 0);
-
-    //std::unique_ptr<ParamsExpr> params;
-    
-    /*if (auto p = dynamic_cast<ParamsExpr*>(left.get())) {
-        params.reset(static_cast<ParamsExpr*>(left.release()));
-    }
-    else if (auto tuple = dynamic_cast<TupleExpr*>(left.get())) {
-        params = std::make_unique<ParamsExpr>(
-            std::unique_ptr<TupleExpr>(static_cast<TupleExpr*>(left.release()))
-        );
-    }
-    else if (auto id = dynamic_cast<IdentifierExpr*>(left.get())) {
-        params = std::make_unique<ParamsExpr>(
-            std::unique_ptr<IdentifierExpr>(static_cast<IdentifierExpr*>(left.release()))
-        );
-    }
-    else
-        throw SyntaxError("Invalid parameter expression", left->start(), left->length());*/
 
     if (peek()->type == TokenType::LBracket) {
         auto body = parseBlock(next()->index);
@@ -211,6 +195,39 @@ std::unique_ptr<Expr> Parser::parseParen(size_t start) {
 
         if (!peek()) {
             throw SyntaxError("Unclosed parentheses", tokens.back().index + tokens.back().text.length(), 0);
+        }
+    }
+}
+
+std::unique_ptr<ListExpr> Parser::parseList(size_t start) {
+    std::vector<std::unique_ptr<Expr>> exprns;
+
+    while (true) {
+        if (peek()->type == TokenType::RBrace) {
+            return std::make_unique<ListExpr>(std::move(exprns), start, peek()->index - start + next()->text.length());
+        }
+
+        size_t exprStart = peek()->index;
+        auto expr = parseExpr();
+        if (!expr) {
+            skipToLineBreak();
+            throw SyntaxError("Expected expression", exprStart, 0);
+        }
+
+        exprns.push_back(std::move(expr));
+
+        if (!peek()) {
+            throw SyntaxError("Unclosed braces", tokens.back().index + tokens.back().text.length(), 0);
+        }
+
+        if (peek()->type == TokenType::RBrace) {
+            return std::make_unique<ListExpr>(std::move(exprns), start, peek()->index - start + next()->text.length());
+        }
+
+        expect(TokenType::Comma);
+
+        if (!peek()) {
+            throw SyntaxError("Unclosed braces", tokens.back().index + tokens.back().text.length(), 0);
         }
     }
 }
@@ -312,6 +329,10 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
 
             if (peek()->type == TokenType::RParen) {
                 next();
+                /*if (peek() && peek()->type == TokenType::RightArrow) {
+                    next();
+                    return parseLambdaType(std::move(type));
+                }*/
                 return std::move(type);
             }
 
@@ -339,11 +360,29 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
                 types.push_back(parseTypeExpr());
             }
 
-            if (peek()->type != TokenType::RParen) {
+            /*if (peek()->type != TokenType::RParen) {
                 throw SyntaxError("Unclosed parentheses in type expression", peek()->index + next()->text.length(), 0);
+            }*/
+
+            Token& rParen = *peek();
+            next();
+            if (peek() && peek()->type == TokenType::RightArrow) {
+                next();
+                if (types.size() <= 1)
+                    return parseLambdaType(
+                        std::move(
+                            std::make_unique<TupleTypeExpr>(
+                                std::move(types),
+                                tok.index,
+                                rParen.index - tok.index + rParen.text.length()
+                            )
+                        )
+                    );
+                else
+                    return parseLambdaType(tok.index, std::move(types));
             }
 
-            return std::make_unique<TupleTypeExpr>(std::move(types), tok.index, peek()->index - tok.index + next()->text.length());
+            return std::make_unique<TupleTypeExpr>(std::move(types), tok.index, rParen.index - tok.index + rParen.text.length());
         }
         case TokenType::LBrace: {
             auto type = parseTypeExpr();
@@ -385,20 +424,34 @@ std::unique_ptr<TypeExpr> Parser::typeLed(std::unique_ptr<TypeExpr> left, const 
             return std::make_unique<OptionTypeExpr>(std::move(options));
         }
         case TokenType::RightArrow: {
-            auto out = parseTypeExpr(5);
-            if (auto params = dynamic_cast<TupleTypeExpr*>(left.get())) {
-                size_t start = params->types.front()->start();
-                return std::make_unique<FunctionTypeExpr>(std::move(params->types), std::move(out), start);
-            }
-
-            size_t start = left->start();
-            std::vector<std::unique_ptr<TypeExpr>> params;
-            params.push_back(std::move(left));
-            return std::make_unique<FunctionTypeExpr>(std::move(params), std::move(out), start);
+            return parseLambdaType(std::move(left));
         }
     }
 
     throw std::exception(); // this shouldn't happen
+}
+
+std::unique_ptr<TypeExpr> Parser::parseLambdaType(size_t start, std::vector<std::unique_ptr<TypeExpr>> params) {
+    auto out = parseTypeExpr(5);
+    return std::make_unique<LambdaTypeExpr>(std::move(params), std::move(out), start);
+}
+
+std::unique_ptr<TypeExpr> Parser::parseLambdaType(std::unique_ptr<TypeExpr> left) {
+    std::vector<std::unique_ptr<TypeExpr>> args;
+    size_t start = left->start();
+    args.push_back(std::move(left));
+    return parseLambdaType(start, std::move(args));
+
+    /*auto out = parseTypeExpr(5);
+    if (auto params = dynamic_cast<TupleTypeExpr*>(left.get())) {
+        size_t start = params->types.front()->start();
+        return std::make_unique<LambdaTypeExpr>(std::move(params->types), std::move(out), start);
+    }
+
+    size_t start = left->start();
+    std::vector<std::unique_ptr<TypeExpr>> params;
+    params.push_back(std::move(left));
+    return std::make_unique<LambdaTypeExpr>(std::move(params), std::move(out), start);*/
 }
 
 #pragma endregion

@@ -119,7 +119,6 @@ struct BinaryExpr;
 struct TernaryExpr;
 struct TupleExpr;
 struct BlockExpr;
-struct ParamsExpr;
 struct LambdaExpr;
 
 class StmtVisitor;
@@ -175,9 +174,9 @@ private:
     void visit(StrExpr& expr) override;
     void visit(BinaryExpr& expr) override;
     void visit(TernaryExpr& expr) override;
+    void visit(ListExpr& expr) override;
     void visit(TupleExpr& expr) override;
     void visit(BlockExpr& expr) override;
-    void visit(ParamsExpr& expr) override;
     void visit(LambdaExpr& expr) override;
 
     void visit(PrimTypeExpr& expr) override;
@@ -185,5 +184,5 @@ private:
     void visit(ListTypeExpr& expr) override;
     void visit(TupleTypeExpr& expr) override;
     void visit(OptionTypeExpr& expr) override;
-    void visit(FunctionTypeExpr& expr) override;
+    void visit(LambdaTypeExpr& expr) override;
 };

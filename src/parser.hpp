@@ -38,6 +38,7 @@ private:
     std::unique_ptr<Expr> led(std::unique_ptr<Expr> left, const Token& tok);
 
     std::unique_ptr<Expr> parseParen(size_t start);
+    std::unique_ptr<ListExpr> parseList(size_t start);
     std::unique_ptr<LambdaExpr> parseParams(size_t start);
     std::unique_ptr<LambdaExpr> parseLambda(std::unique_ptr<Params> params);
     std::unique_ptr<BlockExpr> parseBlock(size_t start);
@@ -46,6 +47,8 @@ private:
     std::unique_ptr<TypeExpr> parseTypeExpr(int rbp);
     std::unique_ptr<TypeExpr> typeNud(const Token& tok);
     std::unique_ptr<TypeExpr> typeLed(std::unique_ptr<TypeExpr> left, const Token& tok);
+    std::unique_ptr<TypeExpr> parseLambdaType(size_t start, std::vector<std::unique_ptr<TypeExpr>> params);
+    std::unique_ptr<TypeExpr> parseLambdaType(std::unique_ptr<TypeExpr> left);
 
     Token& expect(TokenType type);
     void skipToLineBreak();
