@@ -45,6 +45,12 @@ struct PrimType : Type {
     PrimType(Prim prim) : prim(prim) {}
 };
 
+static const TypePtr VOID_TYPE = std::make_shared<PrimType>(Prim::Void);
+static const TypePtr BOOL_TYPE = std::make_shared<PrimType>(Prim::Bool);
+static const TypePtr INT_TYPE  = std::make_shared<PrimType>(Prim::Int);
+static const TypePtr NUM_TYPE  = std::make_shared<PrimType>(Prim::Num);
+static const TypePtr STR_TYPE  = std::make_shared<PrimType>(Prim::Str);
+
 struct ListType : Type {
     const TypePtr type;
     TypeKind kind() const override { return TypeKind::List; }
@@ -96,12 +102,12 @@ struct TupleType : Type {
     TupleType(const std::vector<TypePtr>& types) : types(types) {}
 };
 
-struct OptionType : Type {
+struct UnionType : Type {
     const std::set<TypePtr, TypeLess> options;
     TypeKind kind() const override { return TypeKind::Option; }
 
     int compare(const Type& other) const override {
-        if (auto *o = dynamic_cast<const OptionType*>(&other)) {
+        if (auto *o = dynamic_cast<const UnionType*>(&other)) {
             if (options.size() != o->options.size())
                 return options.size() < o->options.size() ? -1 : 1;
             
@@ -140,33 +146,39 @@ struct OptionType : Type {
     static std::set<TypePtr, TypeLess> merge(const std::vector<TypePtr>& opts) {
         std::set<TypePtr, TypeLess> merged;
         for (auto it = opts.begin(); it != opts.end(); ++it) {
-            if (auto opt = std::dynamic_pointer_cast<const OptionType>(*it)) {
+            if (auto opt = std::dynamic_pointer_cast<const UnionType>(*it)) {
                 for (auto o : opt->options)
                     merged.insert(o);
             }
             else
-                merged.insert(*it);
+                merged.insert(*it ? *it : VOID_TYPE);
         }
 
-        if (merged.size() <= 1) {
-            // Option types must have at least two different options.
-            // Later merge collapsing options to non-option types.
-            throw std::exception();
-        }
         return merged;
     }
 
-    OptionType(const std::vector<TypePtr>& opts) : options(merge(opts)) {}
+    static TypePtr fromOptions(const std::vector<TypePtr>& opts) {
+        auto set = UnionType::merge(opts);
+        if (set.size() == 0)
+            return VOID_TYPE;
+
+        if (set.size() == 1)
+            return *set.begin();
+        
+        return std::make_shared<const UnionType>(set);
+    }
+
+    UnionType(const std::set<TypePtr, TypeLess>& options) : options(options) {}
 };
 
-struct FunctionType : Type {
+struct LambdaType : Type {
     const std::vector<TypePtr> params;
     const TypePtr out;
     // maybe additional pure flag here later?
     TypeKind kind() const override { return TypeKind::Function; }
 
     int compare(const Type& other) const override {
-        if (auto *o = dynamic_cast<const FunctionType*>(&other)) {
+        if (auto *o = dynamic_cast<const LambdaType*>(&other)) {
             int oc = out->compare(*o->out);
             if (oc != 0) return oc;
 
@@ -193,5 +205,8 @@ struct FunctionType : Type {
         return s + typeConColor + ")->" + out->show();
     }
 
-    FunctionType(const std::vector<TypePtr>& params, const TypePtr& out) : params(params), out(out) {};
+    LambdaType(const std::vector<TypePtr>& params, const TypePtr& out) : params(params), out(out) {};
 };
+
+// Inheritance operator: a <= b means a is a subtype of b
+bool operator<=(const TypePtr& a, const TypePtr& b);

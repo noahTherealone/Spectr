@@ -14,8 +14,10 @@ add_executable(spectr
     src/main.cpp
     src/compiler.cpp
     src/lexer.cpp
+    src/type.cpp
     src/expression.cpp
     src/statement.cpp
     src/parser.cpp
     src/name_resolution.cpp
+    src/type_checker.cpp
 )

@@ -77,7 +77,8 @@ void NameResolver::visit(VarDeclStmt& stmt) {
             : stmt.type->start()  - stmt.lhs->start() + stmt.type->length()
     );
 
-    message((shadows ? "~>" : "-> ") + decl->name);
+    stmt.decl = decl;
+    message((shadows ? "~> " : "-> ") + decl->name);
 }
 
 void NameResolver::visit(ReferenceDeclStmt& stmt) {
@@ -187,6 +188,10 @@ void NameResolver::visit(BlockExpr& expr) {
 void NameResolver::visit(LambdaExpr& expr) {
     pushScope();
     for (auto& param : expr.params->params) {
+        // parameter type may not be explicit
+        if (param->type)
+            param->type->accept(*this);
+        
         Decl* shadow = currentScope->lookup(param->id->name);
         VarDecl* decl = declare<VarDecl>(
             param->id->name,
@@ -234,7 +239,7 @@ void NameResolver::visit(TupleTypeExpr& expr) {
         type->accept(*this);
 }
 
-void NameResolver::visit(OptionTypeExpr& expr) {
+void NameResolver::visit(UnionTypeExpr& expr) {
     for (auto& option : expr.options)
         option->accept(*this);
 }

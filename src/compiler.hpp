@@ -5,6 +5,7 @@
 #include "lexer.hpp"
 #include "parser.hpp"
 #include "name_resolution.hpp"
+#include "type_checker.hpp"
 
 class Compiler {
 public:
@@ -16,9 +17,10 @@ public:
 
 private:
     std::string path;
-    Lexer lexer = Lexer(this->path);
-    Parser parser = Parser(this->path);
-    Context ctx;
     std::vector<size_t> offsets;
+    Context ctx;
+    Lexer  lexer  = Lexer(this->path);
+    Parser parser = Parser(this->path);
     NameResolver nameResolver = NameResolver(ctx, this->path, this->offsets);
+    TypeChecker  typeChecker  = TypeChecker(this->path, this->offsets);
 };

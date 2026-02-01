@@ -3,6 +3,7 @@
 #include <string>
 #include <unordered_map>
 #include "lexer.hpp"
+#include "type.hpp"
 
 const std::string primTypeColor = "\033[32m";
 const std::string typeConColor  = "\033[33m";
@@ -30,14 +31,15 @@ inline Prim primByTokenType(const TokenType type) {
     }
 }
 
-struct TypeExprVisitor;
+class TypeExprVisitor;
 
 struct TypeExpr {
     virtual ~TypeExpr() = default;
     virtual std::string show() const = 0;
     size_t start()  const { return start_; }
     size_t length() const { return length_; }
-    virtual void accept(class TypeExprVisitor& visitor) = 0;
+
+    virtual void accept(TypeExprVisitor& v) = 0;
 
 protected:
     size_t start_;
@@ -51,25 +53,26 @@ struct PrimTypeExpr;
 struct NamedTypeExpr;
 struct ListTypeExpr;
 struct TupleTypeExpr;
-struct OptionTypeExpr;
+struct UnionTypeExpr;
 struct LambdaTypeExpr;
 
 class TypeExprVisitor {
 public:
     virtual ~TypeExprVisitor() = default;
 
-    virtual void visit(PrimTypeExpr& expr)     = 0;
-    virtual void visit(NamedTypeExpr& expr)    = 0;
-    virtual void visit(ListTypeExpr& expr)     = 0;
-    virtual void visit(TupleTypeExpr& expr)    = 0;
-    virtual void visit(OptionTypeExpr& expr)   = 0;
+    virtual void visit(PrimTypeExpr& expr)   = 0;
+    virtual void visit(NamedTypeExpr& expr)  = 0;
+    virtual void visit(ListTypeExpr& expr)   = 0;
+    virtual void visit(TupleTypeExpr& expr)  = 0;
+    virtual void visit(UnionTypeExpr& expr) = 0;
     virtual void visit(LambdaTypeExpr& expr) = 0;
 };
 
 struct PrimTypeExpr : TypeExpr {
     const Prim prim;
     std::string show() const override { return primTypeColor + primNames.at(prim) + "\033[0m"; }
-    void accept(class TypeExprVisitor& visitor) { visitor.visit(*this); }
+
+    void accept(TypeExprVisitor& v) override { v.visit(*this); }
 
     PrimTypeExpr(const Token& tok) : TypeExpr(tok), prim(primByTokenType(tok.type)) {}
 };
@@ -80,7 +83,8 @@ struct NamedTypeExpr : TypeExpr {
     const std::string name;
     TypeDecl* decl;
     std::string show() const override { return primTypeColor + name + "\033[0m"; }
-    void accept(class TypeExprVisitor& visitor) { visitor.visit(*this); }
+
+    void accept(TypeExprVisitor& v) override { v.visit(*this); }
 
     NamedTypeExpr(const Token& tok) : TypeExpr(tok), name(tok.text) {}
 };
@@ -88,7 +92,8 @@ struct NamedTypeExpr : TypeExpr {
 struct ListTypeExpr : TypeExpr {
     std::unique_ptr<TypeExpr> type;
     std::string show() const override { return typeConColor + "{" + type->show() + typeConColor + "}\033[0m"; }
-    void accept(class TypeExprVisitor& visitor) { visitor.visit(*this); }
+
+    void accept(TypeExprVisitor& v) override { v.visit(*this); }
 
     ListTypeExpr(std::unique_ptr<TypeExpr> type, size_t start, size_t length) : TypeExpr(start, length), type(std::move(type)) {}
 };
@@ -104,12 +109,12 @@ struct TupleTypeExpr : TypeExpr {
         return s + typeConColor + ")\033[0m";
     }
 
-    void accept(class TypeExprVisitor& visitor) { visitor.visit(*this); }
+    void accept(TypeExprVisitor& v) override { v.visit(*this); }
 
     TupleTypeExpr(std::vector<std::unique_ptr<TypeExpr>> types, size_t start, size_t length) : TypeExpr(start, length), types(std::move(types)) {}
 };
 
-struct OptionTypeExpr : TypeExpr {
+struct UnionTypeExpr : TypeExpr {
     std::vector<std::unique_ptr<TypeExpr>> options;
     std::string show() const override {
         std::string s = typeConColor + "(";
@@ -120,9 +125,9 @@ struct OptionTypeExpr : TypeExpr {
         return s + typeConColor + ")\033[0m";
     };
 
-    void accept(class TypeExprVisitor& visitor) { visitor.visit(*this); }
+    void accept(TypeExprVisitor& v) override { v.visit(*this); }
 
-    OptionTypeExpr(std::vector<std::unique_ptr<TypeExpr>> options) :
+    UnionTypeExpr(std::vector<std::unique_ptr<TypeExpr>> options) :
         TypeExpr(options.front()->start(), options.back()->start() - options.front()->start() + options.back()->length()),
         options(std::move(options)) {}
 };
@@ -139,7 +144,7 @@ struct LambdaTypeExpr : TypeExpr {
         return s + typeConColor + ")->" + out->show() + typeConColor + ")\033[0m" ;
     }
 
-    void accept(class TypeExprVisitor& visitor) { visitor.visit(*this); }
+    void accept(TypeExprVisitor& v) override { v.visit(*this); }
 
     LambdaTypeExpr(std::vector<std::unique_ptr<TypeExpr>> params, std::unique_ptr<TypeExpr> out, size_t start) :
         TypeExpr(start, out->start() - start + out->length()),

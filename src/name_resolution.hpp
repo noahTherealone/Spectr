@@ -31,6 +31,8 @@ struct FunDecl : Decl {
 };
 
 struct TypeDecl : Decl {
+    TypePtr type;
+
     TypeDecl(const std::string& name, size_t start, size_t length) : Decl(name, start, length) {}
 };
 
@@ -183,6 +185,6 @@ private:
     void visit(NamedTypeExpr& expr) override;
     void visit(ListTypeExpr& expr) override;
     void visit(TupleTypeExpr& expr) override;
-    void visit(OptionTypeExpr& expr) override;
+    void visit(UnionTypeExpr& expr) override;
     void visit(LambdaTypeExpr& expr) override;
 };

@@ -21,10 +21,14 @@ void Compiler::runCode(const std::string& code) {
     }
 
     std::cout << "\n";
-
     std::cout << "\033[1m\033[36mName resolution>\033[0m\n";
 
     nameResolver.resolveAST(ast);
+
+    std::cout << "\n";
+    std::cout << primTypeColor + "\033[1mType checking>\033[0m\n";
+
+    typeChecker.typeCheckAST(ast);
 }
 
 void Compiler::runFile(const std::string& path) {

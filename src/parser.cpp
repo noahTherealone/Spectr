@@ -403,7 +403,7 @@ std::unique_ptr<TypeExpr> Parser::typeLed(std::unique_ptr<TypeExpr> left, const 
             auto right = parseTypeExpr(20);
             std::vector<std::unique_ptr<TypeExpr>> options;
 
-            if (auto opt = dynamic_cast<OptionTypeExpr*>(left.get())) {
+            if (auto opt = dynamic_cast<UnionTypeExpr*>(left.get())) {
                 for (auto &o : opt->options) {
                     options.push_back(std::move(o));
                 }
@@ -412,7 +412,7 @@ std::unique_ptr<TypeExpr> Parser::typeLed(std::unique_ptr<TypeExpr> left, const 
                 options.push_back(std::move(left));
             }
 
-            if (auto opt = dynamic_cast<OptionTypeExpr*>(right.get())) {
+            if (auto opt = dynamic_cast<UnionTypeExpr*>(right.get())) {
                 for (auto &o : opt->options) {
                     options.push_back(std::move(o));
                 }
@@ -421,7 +421,7 @@ std::unique_ptr<TypeExpr> Parser::typeLed(std::unique_ptr<TypeExpr> left, const 
                 options.push_back(std::move(right));
             }
 
-            return std::make_unique<OptionTypeExpr>(std::move(options));
+            return std::make_unique<UnionTypeExpr>(std::move(options));
         }
         case TokenType::RightArrow: {
             return parseLambdaType(std::move(left));
@@ -441,17 +441,6 @@ std::unique_ptr<TypeExpr> Parser::parseLambdaType(std::unique_ptr<TypeExpr> left
     size_t start = left->start();
     args.push_back(std::move(left));
     return parseLambdaType(start, std::move(args));
-
-    /*auto out = parseTypeExpr(5);
-    if (auto params = dynamic_cast<TupleTypeExpr*>(left.get())) {
-        size_t start = params->types.front()->start();
-        return std::make_unique<LambdaTypeExpr>(std::move(params->types), std::move(out), start);
-    }
-
-    size_t start = left->start();
-    std::vector<std::unique_ptr<TypeExpr>> params;
-    params.push_back(std::move(left));
-    return std::make_unique<LambdaTypeExpr>(std::move(params), std::move(out), start);*/
 }
 
 #pragma endregion
@@ -594,26 +583,6 @@ std::unique_ptr<Stmt> Parser::matchExpr() {
         return std::make_unique<ExprStmt>(std::move(expr));
 
     switch (tok->type) {
-        /*case TokenType::TypeMarker:
-            if (auto id = dynamic_cast<IdentifierExpr*>(expr.get())) {
-                auto idPtr = std::unique_ptr<IdentifierExpr>(
-                    static_cast<IdentifierExpr*>(expr.release())
-                );
-
-                return matchExplicitVarDecl(std::move(idPtr), *tok);
-            }
-            else
-                throw SyntaxError("lhs of explicit declaration must be an identifier", expr->start(), expr->length());
-        case TokenType::TypeInferredAssign:
-            if (auto id = dynamic_cast<IdentifierExpr*>(expr.get())) {
-                auto idPtr = std::unique_ptr<IdentifierExpr>(
-                    static_cast<IdentifierExpr*>(expr.release())
-                );
-
-                return matchInferredVarDecl(std::move(idPtr), *tok);
-            }
-            else
-                throw SyntaxError("lhs of inferred declaration must be an identifier", expr->start(), expr->length()); */
         case TokenType::Assign:
             return matchAssignment(std::move(expr), *tok);
         case TokenType::ReferenceAssign:
