@@ -90,6 +90,7 @@ std::unique_ptr<Expr> Parser::nud(const Token& tok) {
         case TokenType::StrLiteral:
             return std::make_unique<StrExpr>(tok);
         case TokenType::LParen:
+        case TokenType::FunAppl:
             return parseParen(tok.index);
         case TokenType::LBrace:
             return parseList(tok.index);
@@ -353,7 +354,8 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
         case TokenType::Identifier: {
             return std::make_unique<NamedTypeExpr>(tok);
         }
-        case TokenType::LParen: {
+        case TokenType::LParen:
+        case TokenType::FunAppl: {
             if (peek() && peek()->type == TokenType::RParen)
                 return std::make_unique<PrimTypeExpr>(Prim::Void, tok.index, peek()->index - tok.index + next()->text.length());
 

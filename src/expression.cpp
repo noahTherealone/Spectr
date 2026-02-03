@@ -81,7 +81,6 @@ Params::Params(std::unique_ptr<Expr> expr) {
     }
 
     if (auto id = dynamic_cast<IdentifierExpr*>(expr.get())) {
-        std::cout << "Hello\n";
         *this = Params(std::unique_ptr<IdentifierExpr>(static_cast<IdentifierExpr*>(expr.release())));
         return;
     }

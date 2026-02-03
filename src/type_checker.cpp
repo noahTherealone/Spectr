@@ -1,12 +1,7 @@
 #include <iostream>
-#include <algorithm>
 #include "type_checker.hpp"
 #include "name_resolution.hpp"
 #include "base.hpp"
-
-struct TypeError : SpectrError {
-    using SpectrError::SpectrError;
-};
 
 void TypeChecker::typeCheckAST(const std::vector<std::unique_ptr<Stmt>>& stmts) {
     for (auto& stmt : stmts) {
@@ -14,16 +9,31 @@ void TypeChecker::typeCheckAST(const std::vector<std::unique_ptr<Stmt>>& stmts) 
             stmt->accept(*this);
         }
         catch (const TypeError& err) {
-            auto it = std::upper_bound(offsets.begin(), offsets.end(), err.start);
-            size_t line = it - offsets.begin() - 1;
-            size_t column = err.start - offsets[line];
-            std::cout << "\033[31mTypeError at " + path + " (" + std::to_string(line+1) + ":" + std::to_string(column+1) + "): " + err.msg + "\033[0m\n";
+            std::cout << err.show(path, offsets);
         }
     }
 }
 
 void TypeChecker::message(const std::string& msg) const {    
     std::cout << msg + "\n";
+}
+
+void TypeChecker::report(const std::string& msg, size_t start, size_t length) {
+    TypeError err(msg, start, length);
+    std::cout << err.show(path, offsets);
+    errors.push_back(err);
+}
+
+void TypeChecker::report(const std::string& msg, Stmt* stmt) {
+    report(msg, stmt->start(), stmt->length());
+}
+
+void TypeChecker::report(const std::string& msg, Expr* expr) {
+    report(msg, expr->start(), expr->length());
+}
+
+void TypeChecker::report(const std::string& msg, TypeExpr* expr) {
+    report(msg, expr->start(), expr->length());
 }
 
 #pragma region Statement visitors
@@ -39,17 +49,16 @@ void TypeChecker::visit(VarDeclStmt& stmt) {
         if (stmt.value) {
             TypePtr value = visit(stmt.value.get(), type);
             if (!(value <= type))
-                throw TypeError(
+                report(
                     "Tried assigning value of type " + value->show()
                         + "\033[31m to " + stmt.lhs->show()
                         + "\033[31m of type " + type->show(),
-                    stmt.value->start(), stmt.value->length()
+                    stmt.value.get()
                 );
         }
     }
     else {
-        expected = nullptr;
-        stmt.decl->type = visit(stmt.value.get());
+        stmt.decl->type = visit(stmt.value.get(), nullptr);
     }
 
     result = nullptr;
@@ -73,7 +82,7 @@ void TypeChecker::visit(ReturnStmt& stmt) {
         return;
     }
     
-    result = visit(stmt.value.get());
+    result = visit(stmt.value.get(), expected);
 }
 
 void TypeChecker::visit(ExprStmt& stmt) {
@@ -81,31 +90,10 @@ void TypeChecker::visit(ExprStmt& stmt) {
     result = nullptr;
 }
 
-TypePtr TypeChecker::visit(Stmt* stmt) {
+TypePtr TypeChecker::visit(Stmt* stmt, TypePtr _expected) {
+    ExpectedGuard guard(*this, _expected);
     stmt->accept(*this);
     return result;
-}
-
-TypePtr TypeChecker::visit(Stmt* stmt, TypePtr _expected) {
-    TypePtr previous = expected;
-    expected = _expected;
-    TypePtr _result = visit(stmt);
-    expected = previous;
-    return _result;
-}
-
-bool TypeChecker::typeCheck(std::vector<std::unique_ptr<Stmt>> stmts, TypePtr _expected) {
-    TypePtr previous = expected;
-    expected = _expected;
-    std::vector<TypePtr> results;
-    for (auto& stmt : stmts) {
-        TypePtr r = visit(stmt.get(), _expected);
-        if (r) results.push_back(r);
-    }
-
-    bool match = UnionType::fromOptions(results) <= _expected;
-    expected = previous;
-    return match;
 }
 
 #pragma endregion
@@ -118,7 +106,7 @@ void TypeChecker::visit(IdentifierExpr& expr) {
 
 void TypeChecker::visit(AttributeExpr& expr) {
     std::cout << "Attributes are not supported yet!\n";
-    result = nullptr;
+    result = INVALID_TYPE;
 }
 
 void TypeChecker::visit(VoidExpr& expr) {
@@ -154,65 +142,93 @@ void TypeChecker::visit(BinaryExpr& expr) {
         }
     }
 
-    throw TypeError(
+    report(
         showBinaryOp(expr.op) + " is not defined for operands of types " + left->show() + "\033[31m and " + right->show(),
-        expr.start(),
-        expr.length()
+        &expr
     );
 
-    result = VOID_TYPE;
+    result = INVALID_TYPE;
 }
 
 void TypeChecker::visit(TernaryExpr& expr) {
-    TypePtr primary     = visit(expr.primary.get());
-    TypePtr alternative = visit(expr.alternative.get());
+    TypePtr primary     = visit(expr.primary.get(), expected);
+    TypePtr alternative = visit(expr.alternative.get(), expected);
     TypePtr condition   = visit(expr.condition.get(), BOOL_TYPE);
     
     if (expected && !(primary <= expected))
-        throw TypeError(
+        report(
             "Primary type " + primary->show() + "\033[31m is incompatible with expected type " + expected->show(),
-            expr.primary->start(),
-            expr.primary->length()
+            expr.primary.get()
         );
     
     if (expected && !(alternative <= expected))
-        throw TypeError(
+        report(
             "Alternative type " + alternative->show() + "\033[31m is incompatible with expected type " + expected->show(),
-            expr.alternative->start(),
-            expr.alternative->length()
+            expr.alternative.get()
         );
     
     if (condition->compare(*BOOL_TYPE) != 0)
-        throw TypeError(
+        report(
             "Condition type " + condition->show() + "\033[31m is incompatible with expected type " + BOOL_TYPE->show(),
-            expr.condition->start(),
-            expr.condition->length()
+            expr.condition.get()
         );
     
     result = UnionType::fromOptions( {primary, alternative} );
 }
 
 void TypeChecker::visit(ListExpr& expr) {
-    if (expected) {
+    auto list = expected ? dynamic_cast<const ListType*>(expected.get()) : nullptr;
+
+    if (expected && !list)
+        report(
+            "Expected " + expected->show() + "\033[31m, received list instead",
+            &expr
+        );
+
+    if (list) {
+        std::vector<TypePtr> options;
         for (auto& elem : expr.exprns) {
-            if (!typeCheck(elem.get(), expected))
-                throw TypeError("List element didn't match expected type '" + expected->show() + "'", elem->start(), elem->length());
+            auto t = visit(elem.get(), list->type);
+            if (!(t <= list->type))
+                report(
+                    "List element type " + t->show() + "\033[31m is incompatible with " + list->type->show(),
+                    &expr
+                );
+            
+            options.push_back(t);
         }
 
+        result = std::make_shared<const ListType>(UnionType::fromOptions(options));
         return;
     }
 
     std::vector<TypePtr> options;
     for (auto& elem : expr.exprns)
-        options.push_back(visit(elem.get()));
+        options.push_back(visit(elem.get(), nullptr));
     
-    result = UnionType::fromOptions(options);
+    result = std::make_shared<const ListType>(UnionType::fromOptions(options));
+
 }
 
 void TypeChecker::visit(TupleExpr& expr) {
+    auto tuple = expected ? dynamic_cast<const TupleType*>(expected.get()) : nullptr;
+    if (expected && !tuple)
+        report(
+            "Expected " + expected->show() + "\033[31m, got a tuple instead",
+            &expr
+        );
+    
+    bool expectationCompatible = tuple && expr.exprns.size() == tuple->types.size();
+    if (tuple && !expectationCompatible)
+        report(
+            "Expected tuple of length " + std::to_string(tuple->types.size())
+            + ", received tuple of length " + std::to_string(expr.exprns.size()),
+            &expr
+        );
+
     std::vector<TypePtr> types;
-    for (auto& elem : expr.exprns)
-        types.push_back(visit(elem.get()));
+    for (size_t i = 0; i < expr.exprns.size(); i++)
+        types.push_back(visit(expr.exprns[i].get(), expectationCompatible ? tuple->types[i] : nullptr));
     
     result = std::make_shared<const TupleType>(types);
 }
@@ -223,13 +239,13 @@ void TypeChecker::visit(BlockExpr& expr) {
         if (auto rs = dynamic_cast<ReturnStmt*>(stmt.get())) {
             TypePtr _result = visit(rs->value.get(), expected);
             if (expected && !(_result <= expected))
-                throw TypeError(
+                report(
                     "Block returns type " + _result->show() + "\033[31m incompatible with expected type " + expected->show(),
-                    rs->start(),
-                    rs->length()
+                    rs
                 );
             
-            results.push_back(_result);
+            if (_result)
+                results.push_back(_result);
         }
         else
             results.push_back(visit(stmt.get(), expected));
@@ -241,10 +257,9 @@ void TypeChecker::visit(BlockExpr& expr) {
 void TypeChecker::visit(LambdaExpr& expr) {
     auto lambda = dynamic_cast<const LambdaType*>(expected.get());
     if (expected && !lambda)
-        throw TypeError(
+        report(
             "Lambda expression cannot be of type " + expected->show() + "\033[31m",
-            expr.start(),
-            expr.length()
+            &expr
         );
     
     std::vector<TypePtr> expectedParams;
@@ -257,8 +272,9 @@ void TypeChecker::visit(LambdaExpr& expr) {
             expectedParams.push_back(lambda->arg);
     }
 
-    if (expected && expr.params->params.size() != expectedParams.size())
-        throw TypeError(
+    bool expectationCompatible = lambda && expr.params->params.size() == expectedParams.size();
+    if (lambda && !expectationCompatible)
+        report(
             "Lambda expression has " + std::to_string(expr.params->params.size()) + " parameters, expected " + std::to_string(expectedParams.size()),
             expr.params->start,
             expr.params->length
@@ -270,11 +286,10 @@ void TypeChecker::visit(LambdaExpr& expr) {
         
         if (param->type) {
             TypePtr annotation = visit(param->type.get());
-            if (expected && !(expectedParams[i] <= annotation))
-                throw TypeError(
+            if (expectationCompatible && !(expectedParams[i] <= annotation))
+                report(
                     "Lambda parameter annotation " + annotation->show() + "\033[31m doesn't generalize " + param->decl->type->show() + "\033[0m",
-                    param->type->start(),
-                    param->type->length()
+                    param->type.get()
                 );
 
             param->decl->type = annotation;
@@ -282,28 +297,21 @@ void TypeChecker::visit(LambdaExpr& expr) {
             continue;
         }
         
-        if (!expected)
-            throw TypeError(
+        if (!expectationCompatible)
+            report(
                 "Lambda parameter type for " + param->id->show() + " could not be inferred",
-                param->id->start(),
-                param->id->length()
+                param->id.get()
             );
         
-        param->decl->type = expectedParams[i];
-        params.push_back(expectedParams[i]);
+        param->decl->type = expectationCompatible ? expectedParams[i] : INVALID_TYPE;
+        params.push_back(param->decl->type);
     }
 
-    TypePtr out;
-    if (expected)
-        out = visit(expr.body.get(), lambda->out);
-    else
-        out = visit(expr.body.get(), nullptr);
-    
-    if (expected && !(out <= lambda->out))
-        throw TypeError(
+    TypePtr out = visit(expr.body.get(), lambda ? lambda->out : nullptr);
+    if (lambda && !(out <= lambda->out))
+        report(
             "Lambda body returns wrong type",
-            expr.body->start(),
-            expr.body->length()
+            expr.body.get()
         );
     
     result = std::make_shared<const LambdaType>(TupleType::toTuple(params), out);
@@ -313,40 +321,30 @@ void TypeChecker::visit(ApplExpr& expr) {
     TypePtr fun = visit(expr.fun.get(), nullptr);
     auto lambda = dynamic_cast<const LambdaType*>(fun.get());
     if (!lambda)
-        throw TypeError("Called expression of type " + fun->show() + "\033[0m must be a function",
-            expr.fun->start(), expr.fun->length()
+        report(
+            "Called expression of type " + fun->show() + "\033[31m must be a function",
+            expr.fun.get()
         );
 
-    TypePtr arg = visit(expr.arg.get(), lambda->arg);
-    if (!(arg <= lambda->arg))
-        throw TypeError("Function argument type " + arg->show() + "\033[0m is incompatible with " + lambda->arg->show(),
-            expr.arg->start(), expr.arg->length()
+    TypePtr arg = visit(expr.arg.get(), lambda ? lambda->arg : nullptr);
+    if (lambda && !(arg <= lambda->arg))
+        report(
+            "Function argument type " + arg->show() + "\033[31m is incompatible with " + lambda->arg->show(),
+            expr.arg.get()
         );
     
-    if (expected && !(lambda->out <= expected))
-        throw TypeError("Function return type " + arg->show() + "\033[0m is incompatible with " + lambda->arg->show(),
-            expr.arg->start(), expr.arg->length()
-        );
-    
-    result = lambda->out;
-}
-
-TypePtr TypeChecker::visit(Expr* expr) {
-    expr->accept(*this);
-    return result;
+    result = lambda ? lambda->out : fun;
 }
 
 TypePtr TypeChecker::visit(Expr* expr, TypePtr _expected) {
-    TypePtr previous = expected;
-    expected = _expected;
-    TypePtr _result = visit(expr);
-    message(primTypeColor + sourcePos(path, offsets, expr->start()) + ":\033[0m " + expr->show() + ": " + _result->show() + (_expected ? " (expected: " + _expected->show() + ")" : ""));
-    expected = previous;
-    return _result;
-}
+    ExpectedGuard guard(*this, _expected);
+    expr->accept(*this);
+    message(
+        primTypeColor + sourcePos(path, offsets, expr->start()) + ":\033[0m "
+        + expr->show() + ": " + result->show() + (_expected ? " (expected: " + _expected->show() + ")" : "")
+    );
 
-bool TypeChecker::typeCheck(Expr* expr, TypePtr _expected) {
-    return visit(expr, _expected) <= _expected;
+    return result;
 }
 
 #pragma endregion
@@ -390,10 +388,8 @@ void TypeChecker::visit(LambdaTypeExpr& expr) {
 }
 
 TypePtr TypeChecker::visit(TypeExpr* expr) {
-    TypePtr previous = expected;
-    expected = nullptr;
+    ExpectedGuard guard(*this, nullptr);
     expr->accept(*this);
-    expected = previous;
     return result;
 }
 
