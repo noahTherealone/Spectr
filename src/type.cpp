@@ -2,6 +2,8 @@
 
 // Inheritance operator: a <= b means a is a subtype of b
 bool operator<=(const TypePtr& a, const TypePtr& b) {
+    if (b->compare(*ANY_TYPE) == 0) return true;
+
     if (auto bOptions = dynamic_cast<const UnionType*>(b.get())) {
         if (auto aOptions = dynamic_cast<const UnionType*>(a.get())) {
             for (auto aIt = aOptions->options.begin(); aIt != aOptions->options.end(); aIt++) {
@@ -57,13 +59,8 @@ bool operator<=(const TypePtr& a, const TypePtr& b) {
             if (!(aLambda->out <= bLambda->out))
                 return false;
             
-            if (aLambda->params.size() != bLambda->params.size())
+            if (!(bLambda->arg <= aLambda->arg))
                 return false;
-            
-            for (size_t i = 0; i < aLambda->params.size(); i++) {
-                if (!(bLambda->params[i] <= aLambda->params[i]))
-                    return false;
-            }
 
             return true;
         }

@@ -15,8 +15,8 @@ Token* Parser::next() {
 
 #pragma region Expressions
 
-int lbp(const Token& tok) {
-    switch (tok.type) {
+int Parser::lbp(TokenType type) const {
+    switch (type) {
 #define X(sym, tok, op, lbp, rbp) case TokenType::tok: return lbp;
         BINARY_OPERATORS
 #undef X
@@ -26,13 +26,26 @@ int lbp(const Token& tok) {
     }
 }
 
-int rbp(const Token& tok) {
-    switch (tok.type) {
+int Parser::rbp(TokenType type) const {
+    switch (type) {
 #define X(sym, tok, op, lbp, rbp) case TokenType::tok: return rbp;
         BINARY_OPERATORS
 #undef X
         default: throw std::exception(); // non-operators shouldn't bind to things from the left
     }
+}
+
+bool Parser::isApplStart(TokenType type) const {
+    return type == TokenType::Identifier
+        || type == TokenType::Nil
+        || type == TokenType::False
+        || type == TokenType::True
+        || type == TokenType::IntLiteral
+        || type == TokenType::NumLiteral
+        || type == TokenType::StrLiteral
+        || type == TokenType::LParen
+        || type == TokenType::LBrace
+        || type == TokenType::LBracket;
 }
 
 std::unique_ptr<Expr> Parser::parseExpr(int rbp) {
@@ -43,7 +56,14 @@ std::unique_ptr<Expr> Parser::parseExpr(int rbp) {
     auto left = nud(*tok);
     while (true) {
         tok = peek();
-        if (!tok || lbp(*tok) <= rbp) break;
+        if (!tok) break;
+        if (isApplStart(tok->type) && applBp >= rbp) {
+            auto rhs = parseExpr(applBp + 1);
+            left = std::make_unique<ApplExpr>(std::move(left), std::move(rhs));
+            continue;
+        }
+
+        if (lbp(tok->type) <= rbp) break;
 
         left = led(std::move(left), *next());
     }
@@ -83,29 +103,31 @@ std::unique_ptr<Expr> Parser::led(std::unique_ptr<Expr> left, const Token& tok) 
         if (tok.type == TokenType::RightArrow)
             return parseLambda(std::make_unique<Params>(std::move(left)));
         
-        auto right = parseExpr(rbp(tok));
+        auto right = parseExpr(rbp(tok.type));
         if (!right)
             throw SyntaxError("Expected expression to the right of binary operator", tok.index + tok.text.length(), 0);
 
         return std::make_unique<BinaryExpr>(std::move(left), std::move(right), tok);
     }
-    else if (tok.type == TokenType::IF) {
-        auto condition = parseExpr();
-        if (!condition)
-            throw SyntaxError("Expected condition after infix \"if\"", tok.index + tok.text.length(), 0);
-        
-        
-        Token *elseTok = next();
-        if (!elseTok)
-            throw SyntaxError("Expected \"else\" keyword for ternary operator", tokens.back().index + tokens.back().text.length(), 0);
-        else if (elseTok->type != TokenType::ELSE)
-            throw SyntaxError("Expected \"else\" keyword for ternary operator", elseTok->index, elseTok->text.length());
-        
-        auto alternative = parseExpr();
-        if (!alternative)
-            throw SyntaxError("Expected alternative for ternary operator", tokens[index-1].index + tokens[index-1].text.length(), 0);
-        
-        return std::make_unique<TernaryExpr>(std::move(left), std::move(condition), std::move(alternative));
+
+    switch (tok.type) {
+        case TokenType::IF: {
+            auto condition = parseExpr();
+            if (!condition)
+                throw SyntaxError("Expected condition after infix \"if\"", tok.index + tok.text.length(), 0);
+            
+            Token *elseTok = next();
+            if (!elseTok)
+                throw SyntaxError("Expected \"else\" keyword for ternary operator", tokens.back().index + tokens.back().text.length(), 0);
+            else if (elseTok->type != TokenType::ELSE)
+                throw SyntaxError("Expected \"else\" keyword for ternary operator", elseTok->index, elseTok->text.length());
+            
+            auto alternative = parseExpr();
+            if (!alternative)
+                throw SyntaxError("Expected alternative for ternary operator", tokens[index-1].index + tokens[index-1].text.length(), 0);
+            
+            return std::make_unique<TernaryExpr>(std::move(left), std::move(condition), std::move(alternative));
+        }
     }
 
     throw SyntaxError("Unexpected token inside expression", tok.index, tok.text.length());
@@ -138,7 +160,8 @@ std::unique_ptr<Expr> Parser::parseParen(size_t start) {
     }
 
     if (peek()->type == TokenType::RParen) {
-        return std::make_unique<VoidExpr>(start, peek()->index - start + next()->text.length());
+        Token& rParen = *next();
+        return std::make_unique<VoidExpr>(start, rParen.index - start + rParen.text.length());
     }
 
     if (peek()->type == TokenType::Identifier && index + 1 < tokens.size() && tokens[index+1].type == TokenType::TypeMarker) {
@@ -318,10 +341,16 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
         return std::make_unique<PrimTypeExpr>(tok);
     
     switch (tok.type) {
+        case TokenType::ANY: {
+            return std::make_unique<AnyTypeExpr>(tok);
+        }
         case TokenType::Identifier: {
             return std::make_unique<NamedTypeExpr>(tok);
         }
         case TokenType::LParen: {
+            if (peek() && peek()->type == TokenType::RParen)
+                return std::make_unique<PrimTypeExpr>(Prim::Void, tok.index, peek()->index - tok.index + next()->text.length());
+
             auto type = parseTypeExpr();
             if (!peek()) {
                 throw SyntaxError("Unclosed parentheses in type expression", tokens[index-1].index + tokens[index-1].text.length(), 0);
@@ -329,10 +358,6 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
 
             if (peek()->type == TokenType::RParen) {
                 next();
-                /*if (peek() && peek()->type == TokenType::RightArrow) {
-                    next();
-                    return parseLambdaType(std::move(type));
-                }*/
                 return std::move(type);
             }
 
@@ -360,29 +385,7 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
                 types.push_back(parseTypeExpr());
             }
 
-            /*if (peek()->type != TokenType::RParen) {
-                throw SyntaxError("Unclosed parentheses in type expression", peek()->index + next()->text.length(), 0);
-            }*/
-
-            Token& rParen = *peek();
-            next();
-            if (peek() && peek()->type == TokenType::RightArrow) {
-                next();
-                if (types.size() <= 1)
-                    return parseLambdaType(
-                        std::move(
-                            std::make_unique<TupleTypeExpr>(
-                                std::move(types),
-                                tok.index,
-                                rParen.index - tok.index + rParen.text.length()
-                            )
-                        )
-                    );
-                else
-                    return parseLambdaType(tok.index, std::move(types));
-            }
-
-            return std::make_unique<TupleTypeExpr>(std::move(types), tok.index, rParen.index - tok.index + rParen.text.length());
+            return std::make_unique<TupleTypeExpr>(std::move(types), tok.index, peek()->index - tok.index + next()->text.length());
         }
         case TokenType::LBrace: {
             auto type = parseTypeExpr();
@@ -431,16 +434,9 @@ std::unique_ptr<TypeExpr> Parser::typeLed(std::unique_ptr<TypeExpr> left, const 
     throw std::exception(); // this shouldn't happen
 }
 
-std::unique_ptr<TypeExpr> Parser::parseLambdaType(size_t start, std::vector<std::unique_ptr<TypeExpr>> params) {
-    auto out = parseTypeExpr(5);
-    return std::make_unique<LambdaTypeExpr>(std::move(params), std::move(out), start);
-}
-
 std::unique_ptr<TypeExpr> Parser::parseLambdaType(std::unique_ptr<TypeExpr> left) {
-    std::vector<std::unique_ptr<TypeExpr>> args;
-    size_t start = left->start();
-    args.push_back(std::move(left));
-    return parseLambdaType(start, std::move(args));
+    auto out = parseTypeExpr(5);
+    return std::make_unique<LambdaTypeExpr>(std::move(left), std::move(out));
 }
 
 #pragma endregion

@@ -32,6 +32,10 @@ private:
     std::unique_ptr<Stmt> matchExpr();
     std::unique_ptr<BlockExpr> matchBody();
 
+    int rbp(TokenType type) const;
+    int lbp(TokenType type) const;
+    bool isApplStart(TokenType type) const;
+    const int applBp = 1;
     std::unique_ptr<Expr> parseExpr() { return parseExpr(0); }
     std::unique_ptr<Expr> parseExpr(int rbp);
     std::unique_ptr<Expr> nud(const Token& tok);

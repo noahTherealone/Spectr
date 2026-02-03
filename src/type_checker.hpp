@@ -50,11 +50,13 @@ private:
     void visit(TupleExpr& expr) override;
     void visit(BlockExpr& expr) override;
     void visit(LambdaExpr& expr) override;
+    void visit(ApplExpr& expr) override;
     TypePtr visit(Expr* expr); //must always return a valid TypePtr or throw
     TypePtr visit(Expr* expr, TypePtr _expected);
     bool typeCheck(Expr* expr, TypePtr _expected);
 
     void visit(PrimTypeExpr& expr) override;
+    void visit(AnyTypeExpr& expr) override;
     void visit(NamedTypeExpr& expr) override;
     void visit(ListTypeExpr& expr) override;
     void visit(TupleTypeExpr& expr) override;

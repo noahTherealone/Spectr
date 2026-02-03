@@ -208,12 +208,21 @@ void NameResolver::visit(LambdaExpr& expr) {
     popScope();
 }
 
+void NameResolver::visit(ApplExpr& expr) {
+    expr.fun->accept(*this);
+    expr.arg->accept(*this);
+}
+
 #pragma endregion
 
 #pragma region Type expression visitors
 
 void NameResolver::visit(PrimTypeExpr& expr) {
 
+}
+
+void NameResolver::visit(AnyTypeExpr& expr) {
+    
 }
 
 void NameResolver::visit(NamedTypeExpr& expr) {
@@ -245,9 +254,10 @@ void NameResolver::visit(UnionTypeExpr& expr) {
 }
 
 void NameResolver::visit(LambdaTypeExpr& expr) {
-    for (auto& param : expr.params)
-        param->accept(*this);
+    //for (auto& param : expr.params)
+    //    param->accept(*this);
     
+    expr.arg->accept(*this);
     expr.out->accept(*this);
 }
 

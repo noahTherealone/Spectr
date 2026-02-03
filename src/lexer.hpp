@@ -23,21 +23,21 @@ struct LexerError : SpectrError {
 // Symbol, TokenType, BinaryOperator, left binding power, right binding power
 // X(sym, tok, op, lbp, rbp)
 #define BINARY_OPERATORS                         \
-    X("+",   Plus,         Add,          10, 10) \
-    X("-",   Minus,        Sub,          10, 10) \
-    X("*",   Star,         Mul,          20, 20) \
-    X("/",   Slash,        Div,          20, 20) \
-    X("//",  DoubleSlash,  IntDiv,       20, 20) \
-    X("&&",  And,          And,          5,  5 ) \
-    X("||",  Or,           Or,           4,  4 ) \
-    X("==",  Equals,       Equals,       7,  7 ) \
-    X("!=",  NotEquals,    NotEquals,    9,  9 ) \
-    X("<",   Less,         Less,         9,  9 ) \
-    X("<=",  LessEqual,    LessEqual,    9,  9 ) \
-    X(">",   Greater,      Greater,      9,  9 ) \
-    X(">=",  GreaterEqual, GreaterEqual, 5,  5 ) \
-    X(":",   Colon,        Colon,        3,  3 ) \
-    X("->",  RightArrow,   Map,          2,  2 )
+    X("+",   Plus,         Add,          40, 40) \
+    X("-",   Minus,        Sub,          40, 40) \
+    X("*",   Star,         Mul,          50, 50) \
+    X("/",   Slash,        Div,          50, 50) \
+    X("//",  DoubleSlash,  IntDiv,       50, 50) \
+    X("&&",  And,          And,          15, 15) \
+    X("||",  Or,           Or,           10, 10) \
+    X("==",  Equals,       Equals,       25, 25) \
+    X("!=",  NotEquals,    NotEquals,    30, 30) \
+    X("<",   Less,         Less,         30, 30) \
+    X("<=",  LessEqual,    LessEqual,    30, 30) \
+    X(">",   Greater,      Greater,      30, 30) \
+    X(">=",  GreaterEqual, GreaterEqual, 20, 20) \
+    X(":",   Colon,        Colon,        7,  7 ) \
+    X("->",  RightArrow,   Map,          5,  5 )
 
 // keyword, TokenType, literal Expr type, Prim
 // X(kw, tok, lit, pt)
@@ -69,6 +69,8 @@ enum class TokenType {
     PRIMITIVE_TYPES
 #undef X
 
+    ANY,
+
 //  Binary Operators
 
 #define X(sym, tok, op, lbp, rbp) tok,
@@ -86,7 +88,6 @@ enum class TokenType {
     
     AttrAccess,
     Indexing,
-    FunApp, // function application
     Comma,
 
 //  Statements
@@ -158,6 +159,9 @@ constexpr TokenType wordToTokenType(std::string_view s) {
         if (kw == s)
             return tt;
     }
+
+    if (s == "any")
+        return TokenType::ANY;
 
     return TokenType::Identifier;
 }

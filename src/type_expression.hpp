@@ -50,6 +50,7 @@ protected:
 };
 
 struct PrimTypeExpr;
+struct AnyTypeExpr;
 struct NamedTypeExpr;
 struct ListTypeExpr;
 struct TupleTypeExpr;
@@ -61,10 +62,11 @@ public:
     virtual ~TypeExprVisitor() = default;
 
     virtual void visit(PrimTypeExpr& expr)   = 0;
+    virtual void visit(AnyTypeExpr& expr)    = 0;
     virtual void visit(NamedTypeExpr& expr)  = 0;
     virtual void visit(ListTypeExpr& expr)   = 0;
     virtual void visit(TupleTypeExpr& expr)  = 0;
-    virtual void visit(UnionTypeExpr& expr) = 0;
+    virtual void visit(UnionTypeExpr& expr)  = 0;
     virtual void visit(LambdaTypeExpr& expr) = 0;
 };
 
@@ -75,6 +77,13 @@ struct PrimTypeExpr : TypeExpr {
     void accept(TypeExprVisitor& v) override { v.visit(*this); }
 
     PrimTypeExpr(const Token& tok) : TypeExpr(tok), prim(primByTokenType(tok.type)) {}
+    PrimTypeExpr(Prim prim, size_t start, size_t length) : TypeExpr(start, length), prim(prim) {}
+};
+
+struct AnyTypeExpr : TypeExpr {
+    std::string show() const override { return primTypeColor + "any\033[0m"; }
+    void accept(TypeExprVisitor& v) override { v.visit(*this); }
+    AnyTypeExpr(const Token& tok) : TypeExpr(tok) {}
 };
 
 struct TypeDecl;
@@ -133,20 +142,15 @@ struct UnionTypeExpr : TypeExpr {
 };
 
 struct LambdaTypeExpr : TypeExpr {
-    std::vector<std::unique_ptr<TypeExpr>> params;
+    std::unique_ptr<TypeExpr> arg;
     std::unique_ptr<TypeExpr> out;
     std::string show() const override {
-        std::string s = typeConColor + "((";
-        for (auto it = params.begin(); it != params.end(); ++it) {
-            s += (*it)->show() + (std::next(it) != params.end() ? typeConColor + ", " : "");
-        }
-
-        return s + typeConColor + ")->" + out->show() + typeConColor + ")\033[0m" ;
+        return typeConColor + "(" + arg->show() + typeConColor + "->" + out->show() + typeConColor + ")\033[0m";
     }
 
     void accept(TypeExprVisitor& v) override { v.visit(*this); }
 
-    LambdaTypeExpr(std::vector<std::unique_ptr<TypeExpr>> params, std::unique_ptr<TypeExpr> out, size_t start) :
-        TypeExpr(start, out->start() - start + out->length()),
-        params(std::move(params)), out(std::move(out)) {}
+    LambdaTypeExpr(std::unique_ptr<TypeExpr> arg, std::unique_ptr<TypeExpr> out) :
+        TypeExpr(arg->start(), out->start() - arg->start() + out->length()),
+        arg(std::move(arg)), out(std::move(out)) {}
 };

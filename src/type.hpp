@@ -9,7 +9,8 @@ enum class TypeKind {
     List,
     Tuple,
     Option,
-    Function
+    Function,
+    Any
 };
 
 struct Type {
@@ -99,6 +100,12 @@ struct TupleType : Type {
         return s + typeConColor + ")\033[0m";
     }
 
+    static TypePtr toTuple(const std::vector<TypePtr>& types) {
+        if (types.size() == 0) return VOID_TYPE;
+        if (types.size() == 1) return *types.begin();
+        return std::make_shared<TupleType>(types);
+    }
+
     TupleType(const std::vector<TypePtr>& types) : types(types) {}
 };
 
@@ -172,7 +179,7 @@ struct UnionType : Type {
 };
 
 struct LambdaType : Type {
-    const std::vector<TypePtr> params;
+    const TypePtr arg;
     const TypePtr out;
     // maybe additional pure flag here later?
     TypeKind kind() const override { return TypeKind::Function; }
@@ -182,13 +189,8 @@ struct LambdaType : Type {
             int oc = out->compare(*o->out);
             if (oc != 0) return oc;
 
-            if (params.size() != o->params.size())
-                return params.size() < o->params.size() ? -1 : 1;
-            
-            for (size_t i = 0; i < params.size(); ++i) {
-                int c = params[i]->compare(*o->params[i]);
-                if (c != 0) return c;
-            }
+            int ac = arg->compare(*o->arg);
+            if (ac != 0) return ac;
 
             return 0;
         }
@@ -197,16 +199,26 @@ struct LambdaType : Type {
     }
 
     std::string show() const override {
-        std::string s = typeConColor + "(";
-        for (auto it = params.begin(); it != params.end(); ++it) {
-            s += (*it)->show() + (std::next(it) != params.end() ? typeConColor + ", " : "");
-        }
-
-        return s + typeConColor + ")->" + out->show();
+        return typeConColor + "(" + arg->show() + typeConColor + "->" + out->show() + typeConColor + ")\033[0m";
     }
 
-    LambdaType(const std::vector<TypePtr>& params, const TypePtr& out) : params(params), out(out) {};
+    LambdaType(const TypePtr& arg, const TypePtr& out) : arg(arg), out(out) {};
 };
+
+struct AnyType : Type {
+    TypeKind kind() const override { return TypeKind::Any; }
+    int compare(const Type& other) const override {
+        return int(kind()) - int(other.kind());
+    }
+
+    std::string show() const override {
+        return primTypeColor + "any\033[0m";
+    }
+
+    AnyType() {};
+};
+
+static const TypePtr ANY_TYPE  = std::make_shared<AnyType>();
 
 // Inheritance operator: a <= b means a is a subtype of b
 bool operator<=(const TypePtr& a, const TypePtr& b);

@@ -62,6 +62,19 @@ Params::Params(std::unique_ptr<IdentifierExpr> id) : start(id->start()), length(
 }
 
 Params::Params(std::unique_ptr<Expr> expr) {
+    if (auto nil = dynamic_cast<VoidExpr*>(expr.get())) {
+        *this = Params();
+        this->start = expr->start();
+        this->length = expr->length();
+        this->params.push_back(
+            std::make_unique<Param>(
+                std::make_unique<IdentifierExpr>(expr->start(), expr->length()),
+                std::make_unique<PrimTypeExpr>(Prim::Void, expr->start(), expr->length())
+            )
+        );
+        return;
+    }
+
     if (auto tuple = dynamic_cast<TupleExpr*>(expr.get())) {
         *this = Params(std::unique_ptr<TupleExpr>(static_cast<TupleExpr*>(expr.release())));
         return;
@@ -104,3 +117,10 @@ LambdaExpr::LambdaExpr(std::unique_ptr<Params> params, std::unique_ptr<BlockExpr
 
 LambdaExpr::LambdaExpr(std::unique_ptr<TupleExpr> params, std::unique_ptr<BlockExpr> body) :
     LambdaExpr(std::make_unique<Params>(std::move(params)), std::move(body)) {}
+
+std::string ApplExpr::show() const {
+    return exprColor + "(\033[0m" + fun->show() + " " + arg->show() + exprColor + ")\033[0m";
+}
+
+ApplExpr::ApplExpr(std::unique_ptr<Expr> fun, std::unique_ptr<Expr> arg) :
+    Expr(fun->start(), arg->length() - fun->length() + arg->start()), fun(std::move(fun)), arg(std::move(arg)) {}

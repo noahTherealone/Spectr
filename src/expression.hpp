@@ -44,6 +44,7 @@ struct ListExpr;
 struct TupleExpr;
 struct BlockExpr;
 struct LambdaExpr;
+struct ApplExpr;
 
 class ExprVisitor {
 public:
@@ -62,6 +63,7 @@ public:
     virtual void visit(TupleExpr& expr)      = 0;
     virtual void visit(BlockExpr& expr)      = 0;
     virtual void visit(LambdaExpr& expr)     = 0;
+    virtual void visit(ApplExpr& expr)       = 0;
 };
 
 struct VarDecl;
@@ -76,6 +78,7 @@ struct IdentifierExpr : Expr {
     void accept(ExprVisitor& v) override { v.visit(*this); }
 
     IdentifierExpr(const Token& tok) : Expr(tok), name(tok.text) {}
+    IdentifierExpr(size_t start, size_t length) : Expr(start, length) {}
 };
 
 struct AttributeExpr : Expr {
@@ -307,4 +310,14 @@ struct LambdaExpr : Expr {
     
     LambdaExpr(std::unique_ptr<Params> params, std::unique_ptr<BlockExpr> body);
     LambdaExpr(std::unique_ptr<TupleExpr> params, std::unique_ptr<BlockExpr> body);
+};
+
+struct ApplExpr : Expr {
+    std::unique_ptr<Expr> fun;
+    std::unique_ptr<Expr> arg;
+    std::string show() const override;
+
+    void accept(ExprVisitor& v) override { v.visit(*this); }
+
+    ApplExpr(std::unique_ptr<Expr> fun, std::unique_ptr<Expr> arg);
 };

@@ -219,7 +219,7 @@ void TypeChecker::visit(BlockExpr& expr) {
             TypePtr _result = visit(rs->value.get(), expected);
             if (expected && !(_result <= expected))
                 throw TypeError(
-                    "Block does returns type " + _result->show() + "\033[31m incompatible with expected type " + expected->show(),
+                    "Block returns type " + _result->show() + "\033[31m incompatible with expected type " + expected->show(),
                     rs->start(),
                     rs->length()
                 );
@@ -242,9 +242,19 @@ void TypeChecker::visit(LambdaExpr& expr) {
             expr.length()
         );
     
-    if (expected && expr.params->params.size() != lambda->params.size())
+    std::vector<TypePtr> expectedParams;
+    if (lambda) {
+        if (auto tupleArg = dynamic_cast<const TupleType*>(lambda->arg.get())) {
+            for (auto t : tupleArg->types)
+                expectedParams.push_back(t);
+        }
+        else
+            expectedParams.push_back(lambda->arg);
+    }
+
+    if (expected && expr.params->params.size() != expectedParams.size())
         throw TypeError(
-            "Lambda expression has " + std::to_string(expr.params->params.size()) + " parameters, expected " + std::to_string(lambda->params.size()),
+            "Lambda expression has " + std::to_string(expr.params->params.size()) + " parameters, expected " + std::to_string(expectedParams.size()),
             expr.params->start,
             expr.params->length
         );
@@ -255,9 +265,9 @@ void TypeChecker::visit(LambdaExpr& expr) {
         
         if (param->type) {
             TypePtr annotation = visit(param->type.get());
-            if (expected && !(lambda->params[i] <= annotation))
+            if (expected && !(expectedParams[i] <= annotation))
                 throw TypeError(
-                    "Lambda parameter annotation " + annotation->show() + "\033[31m doesn't generalize " + expected->show() + "\033[0m",
+                    "Lambda parameter annotation " + annotation->show() + "\033[31m doesn't generalize " + param->decl->type->show() + "\033[0m",
                     param->type->start(),
                     param->type->length()
                 );
@@ -274,8 +284,8 @@ void TypeChecker::visit(LambdaExpr& expr) {
                 param->id->length()
             );
         
-        param->decl->type = lambda->params[i];
-        params.push_back(lambda->params[i]);
+        param->decl->type = expectedParams[i];
+        params.push_back(expectedParams[i]);
     }
 
     TypePtr out;
@@ -291,7 +301,29 @@ void TypeChecker::visit(LambdaExpr& expr) {
             expr.body->length()
         );
     
-    result = std::make_shared<const LambdaType>(params, out);
+    result = std::make_shared<const LambdaType>(TupleType::toTuple(params), out);
+}
+
+void TypeChecker::visit(ApplExpr& expr) {
+    TypePtr fun = visit(expr.fun.get(), nullptr);
+    auto lambda = dynamic_cast<const LambdaType*>(fun.get());
+    if (!lambda)
+        throw TypeError("Called expression of type " + fun->show() + "\033[0m must be a function",
+            expr.fun->start(), expr.fun->length()
+        );
+
+    TypePtr arg = visit(expr.arg.get(), lambda->arg);
+    if (!(arg <= lambda->arg))
+        throw TypeError("Function argument type " + arg->show() + "\033[0m is incompatible with " + lambda->arg->show(),
+            expr.arg->start(), expr.arg->length()
+        );
+    
+    if (expected && !(lambda->out <= expected))
+        throw TypeError("Function return type " + arg->show() + "\033[0m is incompatible with " + lambda->arg->show(),
+            expr.arg->start(), expr.arg->length()
+        );
+    
+    result = lambda->out;
 }
 
 TypePtr TypeChecker::visit(Expr* expr) {
@@ -303,6 +335,7 @@ TypePtr TypeChecker::visit(Expr* expr, TypePtr _expected) {
     TypePtr previous = expected;
     expected = _expected;
     TypePtr _result = visit(expr);
+    message(expr->show() + ": " + _result->show() + (_expected ? " (expected: " + _expected->show() + ")" : ""));
     expected = previous;
     return _result;
 }
@@ -317,6 +350,10 @@ bool TypeChecker::typeCheck(Expr* expr, TypePtr _expected) {
 
 void TypeChecker::visit(PrimTypeExpr& expr) {
     result = std::make_shared<const PrimType>(expr.prim);
+}
+
+void TypeChecker::visit(AnyTypeExpr& expr) {
+    result = std::make_shared<const AnyType>();
 }
 
 void TypeChecker::visit(NamedTypeExpr& expr) {
@@ -344,15 +381,14 @@ void TypeChecker::visit(UnionTypeExpr& expr) {
 }
 
 void TypeChecker::visit(LambdaTypeExpr& expr) {
-    std::vector<TypePtr> p;
-    for (auto& expr : expr.params)
-        p.push_back(visit(expr.get()));
-    
-    result = std::make_shared<const LambdaType>(p, visit(expr.out.get()));
+    result = std::make_shared<const LambdaType>(visit(expr.arg.get()), visit(expr.out.get()));
 }
 
 TypePtr TypeChecker::visit(TypeExpr* expr) {
+    TypePtr previous = expected;
+    expected = nullptr;
     expr->accept(*this);
+    expected = previous;
     return result;
 }
 
