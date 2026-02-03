@@ -12,6 +12,7 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 add_executable(spectr
     src/main.cpp
+    src/base.cpp
     src/compiler.cpp
     src/lexer.cpp
     src/type.cpp

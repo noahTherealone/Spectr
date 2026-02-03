@@ -4,6 +4,7 @@
 #include "name_resolution.hpp"
 #include "expression.hpp"
 #include "type_expression.hpp"
+#include "base.hpp"
 
 void NameResolver::pushScope() {
     scopes.push_back(std::make_unique<Scope>(currentScope));
@@ -26,10 +27,7 @@ void NameResolver::resolveAST(const std::vector<std::unique_ptr<Stmt>>& ast) {
             stmt->accept(*this);
         }
         catch (const NameError& err) {
-            auto it = std::upper_bound(offsets.begin(), offsets.end(), err.start);
-            size_t line = it - offsets.begin() - 1;
-            size_t column = err.start - offsets[line];
-            std::cout << "\033[31mNameError at " + path + " (" + std::to_string(line+1) + ":" + std::to_string(column+1) + "): " + err.msg + "\033[0m\n";
+            std::cout << "\033[31mNameError at " + sourcePos(path, offsets, err.start) + ": " + err.msg + "\033[0m\n";
         }
     }
 }
@@ -222,7 +220,7 @@ void NameResolver::visit(PrimTypeExpr& expr) {
 }
 
 void NameResolver::visit(AnyTypeExpr& expr) {
-    
+
 }
 
 void NameResolver::visit(NamedTypeExpr& expr) {

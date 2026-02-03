@@ -7,6 +7,8 @@
 #include "type_expression.hpp"
 #include "statement.hpp"
 
+struct SpectrError;
+
 struct SyntaxError : SpectrError {
     using SpectrError::SpectrError;
 };
@@ -35,7 +37,7 @@ private:
     int rbp(TokenType type) const;
     int lbp(TokenType type) const;
     bool isApplStart(TokenType type) const;
-    const int applBp = 1;
+    const int applBp = 70;
     std::unique_ptr<Expr> parseExpr() { return parseExpr(0); }
     std::unique_ptr<Expr> parseExpr(int rbp);
     std::unique_ptr<Expr> nud(const Token& tok);

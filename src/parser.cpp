@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <charconv>
 #include "parser.hpp"
+#include "base.hpp"
 
 Token* Parser::peek() {
     return index < tokens.size() ? &tokens[index] : nullptr;
@@ -21,7 +22,8 @@ int Parser::lbp(TokenType type) const {
         BINARY_OPERATORS
 #undef X
 
-        case TokenType::IF: return 2;
+        case TokenType::FunAppl: return 70;
+        case TokenType::IF:      return 2;
         default: return 0;
     }
 }
@@ -111,6 +113,10 @@ std::unique_ptr<Expr> Parser::led(std::unique_ptr<Expr> left, const Token& tok) 
     }
 
     switch (tok.type) {
+        case TokenType::FunAppl: {
+            auto arg = parseParen(tok.index);
+            return std::make_unique<ApplExpr>(std::move(left), std::move(arg));
+        }
         case TokenType::IF: {
             auto condition = parseExpr();
             if (!condition)
@@ -697,10 +703,7 @@ std::vector<std::unique_ptr<Stmt>> Parser::parse() {
             }
         }
         catch (const SyntaxError& err) {
-            auto it = std::upper_bound(lineOffsets.begin(), lineOffsets.end(), err.start);
-            size_t line = it - lineOffsets.begin() - 1;
-            size_t column = err.start - lineOffsets[line];
-            std::cout << "\033[31mSyntaxError at " + path + " (" + std::to_string(line+1) + ":" + std::to_string(column+1) + "): " + err.msg + "\033[0m\n";
+            std::cout << "\033[31mSyntaxError at " + sourcePos(path, lineOffsets, err.start) + ": " + err.msg + "\033[0m\n";
         }
     }
 

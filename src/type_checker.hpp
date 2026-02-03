@@ -5,11 +5,7 @@
 #include "type_expression.hpp"
 #include "type.hpp"
 
-struct SpectrError;
-
-struct TypeError : SpectrError {
-    using SpectrError::SpectrError;
-};
+struct TypeError;
 
 class TypeChecker : public StmtVisitor, public ExprVisitor, public TypeExprVisitor {
 public:

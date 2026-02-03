@@ -87,6 +87,7 @@ enum class TokenType {
     RBracket,
     
     AttrAccess,
+    FunAppl,
     Indexing,
     Comma,
 
@@ -108,8 +109,6 @@ enum class TokenType {
     Assign,
     TypeInferredAssign,
     ReferenceAssign,
-    LazyAssign,
-    MemoLazyAssign,
     PlusAssign,
     MinusAssign,
     StarAssign,
@@ -166,7 +165,7 @@ constexpr TokenType wordToTokenType(std::string_view s) {
     return TokenType::Identifier;
 }
 
-constexpr std::array<std::pair<std::string_view, TokenType>, 35> symbols = {{
+constexpr std::array<std::pair<std::string_view, TokenType>, 33> symbols = {{
     {"(",    TokenType::LParen},
     {")",    TokenType::RParen},
     {"[",    TokenType::LBracket},
@@ -176,8 +175,6 @@ constexpr std::array<std::pair<std::string_view, TokenType>, 35> symbols = {{
     {"=",    TokenType::Assign},
     {":=",   TokenType::TypeInferredAssign},
     {"&=",   TokenType::ReferenceAssign},
-    {"::=",  TokenType::LazyAssign},
-    {":=:",  TokenType::MemoLazyAssign},
     {",",    TokenType::Comma},
 
 #define X(sym, tok, op, lbp, rbp) {sym, TokenType::tok},
@@ -211,6 +208,7 @@ struct Token {
     std::string show() const {
         if (type == TokenType::LineBreak)  return " ";
         if (type == TokenType::StrLiteral) return "\"" + text + "\"";
+        if (type == TokenType::FunAppl)    return "_(";
         return text;
     }
 };

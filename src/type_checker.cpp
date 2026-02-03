@@ -2,6 +2,11 @@
 #include <algorithm>
 #include "type_checker.hpp"
 #include "name_resolution.hpp"
+#include "base.hpp"
+
+struct TypeError : SpectrError {
+    using SpectrError::SpectrError;
+};
 
 void TypeChecker::typeCheckAST(const std::vector<std::unique_ptr<Stmt>>& stmts) {
     for (auto& stmt : stmts) {
@@ -335,7 +340,7 @@ TypePtr TypeChecker::visit(Expr* expr, TypePtr _expected) {
     TypePtr previous = expected;
     expected = _expected;
     TypePtr _result = visit(expr);
-    message(expr->show() + ": " + _result->show() + (_expected ? " (expected: " + _expected->show() + ")" : ""));
+    message(primTypeColor + sourcePos(path, offsets, expr->start()) + ":\033[0m " + expr->show() + ": " + _result->show() + (_expected ? " (expected: " + _expected->show() + ")" : ""));
     expected = previous;
     return _result;
 }

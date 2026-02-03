@@ -1,5 +1,8 @@
 
-x: int = (5i + 4i) * 4i
+f: int -> int -> int
+f(5i) 6i + 7i
+
+#[x: int = (5i + 4i) * 4i
 y := 5i
 
 option: int | str
@@ -8,7 +11,7 @@ nothing: void = nil
 
 func: int -> int = (arg: int) -> arg
 
-eval: (int -> int, int) -> int = (f, i) -> f(i)
+eval: (int -> int, int) -> int = (f, i) -> f i
 eval (func, 5i)
 
 curry: ((int -> int, int) -> int) -> ((int -> int) -> int -> int) = unseasoned -> f -> i -> unseasoned (f, i)
@@ -24,7 +27,7 @@ constant
 constant()
 
 test: any = 5i
-test
+test]#
 
 #[
 [

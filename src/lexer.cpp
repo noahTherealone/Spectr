@@ -149,7 +149,11 @@ void Lexer::tokenizeSymbol() {
     for (size_t l = symbol.length(); l > 0; l--) {
         std::string_view subsymbol = symbol.substr(0, l);
         if (auto type = checkSymbol(subsymbol)) {
-            tokens->push_back(Token{ *type, std::string(subsymbol), start });
+            if (*type == TokenType::LParen && start > 0 && !std::isspace(code[start - 1]))
+                tokens->push_back(Token{ TokenType::FunAppl, std::string(subsymbol), start });
+            else
+                tokens->push_back(Token{ *type, std::string(subsymbol), start });
+            
             index = start + l;
             return;
         }
