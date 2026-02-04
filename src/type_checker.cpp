@@ -73,6 +73,7 @@ void TypeChecker::visit(AssignmentStmt& stmt) {
 }
 
 void TypeChecker::visit(AliasDeclStmt& stmt) {
+    stmt.name->decl->type = visit(stmt.value.get());
     result = nullptr;
 }
 
@@ -385,6 +386,31 @@ void TypeChecker::visit(UnionTypeExpr& expr) {
 
 void TypeChecker::visit(LambdaTypeExpr& expr) {
     result = std::make_shared<const LambdaType>(visit(expr.arg.get()), visit(expr.out.get()));
+}
+
+void TypeChecker::visit(StructTypeExpr& expr) {
+    std::unordered_map<std::string, TypePtr> fields;
+    for (auto& stmt : expr.stmts) {
+        if (stmt->type) {
+            TypePtr type = visit(stmt->type.get());
+            fields.emplace(stmt->lhs->name, type);
+        }
+        else {
+            report(
+                "Fields of structs must be annotated explicitly",
+                stmt->lhs.get()
+            );
+        }
+
+        if (stmt->value) {
+            report(
+                "Default values of fields are not supported right now",
+                stmt->value.get()
+            );
+        }
+    }
+
+    result = StructType::fromFields(fields);
 }
 
 TypePtr TypeChecker::visit(TypeExpr* expr) {

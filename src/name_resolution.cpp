@@ -101,6 +101,8 @@ void NameResolver::visit(AliasDeclStmt& stmt) {
         stmt.value->start() - stmt.name->start() + stmt.value->length()
     );
 
+    stmt.name->decl = decl;
+
     message(primTypeColor + "-> " + decl->name + "\033[0m");
 }
 
@@ -257,6 +259,14 @@ void NameResolver::visit(LambdaTypeExpr& expr) {
     
     expr.arg->accept(*this);
     expr.out->accept(*this);
+}
+
+void NameResolver::visit(StructTypeExpr& expr) {
+    pushScope();
+    for (auto &stmt : expr.stmts)
+        stmt->accept(*this);
+    
+    popScope();
 }
 
 #pragma endregion

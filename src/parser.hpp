@@ -30,6 +30,7 @@ private:
     std::unique_ptr<Stmt> matchInferredVarDecl(std::unique_ptr<IdentifierExpr> lhs, const Token& assignmentOp);
     std::unique_ptr<Stmt> matchVarDecl(std::unique_ptr<IdentifierExpr> lhs, std::unique_ptr<TypeExpr> type, const Token& assignmentOp);
     std::unique_ptr<Stmt> matchAssignment(std::unique_ptr<Expr> lhs, const Token& assignmentSign);
+    std::unique_ptr<Stmt> matchTypeStmt(const Token& tok);
     std::unique_ptr<Stmt> matchIf();
     std::unique_ptr<Stmt> matchExpr();
     std::unique_ptr<BlockExpr> matchBody();
@@ -53,8 +54,11 @@ private:
     std::unique_ptr<TypeExpr> parseTypeExpr(int rbp);
     std::unique_ptr<TypeExpr> typeNud(const Token& tok);
     std::unique_ptr<TypeExpr> typeLed(std::unique_ptr<TypeExpr> left, const Token& tok);
+
+    std::unique_ptr<TypeExpr> parseTypeParen(size_t start);
     std::unique_ptr<TypeExpr> parseLambdaType(size_t start, std::vector<std::unique_ptr<TypeExpr>> params);
     std::unique_ptr<TypeExpr> parseLambdaType(std::unique_ptr<TypeExpr> left);
+    std::unique_ptr<TypeExpr> parseStructType(size_t start);
 
     Token& expect(TokenType type);
     void skipToLineBreak();

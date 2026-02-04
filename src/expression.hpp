@@ -4,6 +4,7 @@
 #include <memory>
 #include <charconv>
 #include "type.hpp"
+#include "lexer.hpp"
 //#include "name_resolution.hpp"
 
 const std::string exprColor = "\033[36m";
@@ -281,13 +282,14 @@ struct BlockExpr : Expr {
     BlockExpr(std::unique_ptr<Stmt> stmt);
 };
 
+struct TypeExpr;
+
 struct Param {
     VarDecl* decl;
     std::unique_ptr<IdentifierExpr> id;
     std::unique_ptr<TypeExpr> type;
 
-    Param(std::unique_ptr<IdentifierExpr> id, std::unique_ptr<TypeExpr> type) :
-        id(std::move(id)), type(std::move(type)) {}
+    Param(std::unique_ptr<IdentifierExpr> id, std::unique_ptr<TypeExpr> type);
 };
 
 struct Params {

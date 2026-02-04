@@ -41,6 +41,9 @@ BlockExpr::BlockExpr(std::unique_ptr<Stmt> stmt) :
         stmts = std::move(stmts_);
     }
 
+Param::Param(std::unique_ptr<IdentifierExpr> id, std::unique_ptr<TypeExpr> type) :
+    id(std::move(id)), type(std::move(type)) {}
+
 Params::Params(std::unique_ptr<TupleExpr> tuple) {
     for (auto& expr : tuple->takeExprns()) {
         auto id = dynamic_cast<IdentifierExpr*>(expr.get());

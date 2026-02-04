@@ -1,4 +1,5 @@
 #include "type.hpp"
+#include "type_expression.hpp"
 
 int InvalidType::compare(const Type& other) const {
     if (auto *o = dynamic_cast<const InvalidType*>(&other))
@@ -114,6 +115,46 @@ std::string LambdaType::show() const {
     return typeConColor + "(" + arg->show() + typeConColor + "->" + out->show() + typeConColor + ")\033[0m";
 }
 
+int StructType::compare(const Type& other) const {
+    if (auto o = dynamic_cast<const StructType*>(&other)) {
+        int d = (o->super == nullptr) - (super == nullptr);
+        if (d != 0) return d;
+
+        if (super) {
+            d = super->compare(*o->super);
+            if (d != 0) return d;
+        }
+
+        d = fields.size() - o->fields.size();
+        if (d != 0) return d;
+
+        auto keysA = sortedKeys();
+        auto keysB = o->sortedKeys();
+
+        for (size_t i = 0; i < keysA.size(); i++) {
+            if (keysA[i] != keysB[i])
+                return keysA[i] < keysB[i] ? -1 : 1;
+            
+            d = fields.at(keysA[i])->compare(*o->fields.at(keysB[i]));
+            if (d != 0) return d;
+        }
+    }
+
+    return int(kind()) - int(other.kind());
+}
+
+std::string StructType::show() const {
+    std::string s = typeConColor + "[ ";
+    auto keys = sortedKeys();
+    for (auto it = keys.begin(); it != keys.end(); it++) {
+        s += "\033[0m" + *it + typeConColor + ": " + fields.at(*it)->show();
+        if (std::next(it) != keys.end())
+            s += typeConColor + ", ";
+    }
+
+    return s + typeConColor + " ]\033[0m";
+};
+
 // Inheritance operator: a <= b means a is a subtype of b
 bool operator<=(const TypePtr& a, const TypePtr& b) {
     if (b->compare(*ANY_TYPE) == 0 || b->compare(*INVALID_TYPE) == 0) return true;
@@ -180,6 +221,20 @@ bool operator<=(const TypePtr& a, const TypePtr& b) {
         }
 
         return false;
+    }
+
+    if (const StructType* aStruct = dynamic_cast<const StructType*>(a.get())) {
+        if (const StructType* bStruct = dynamic_cast<const StructType*>(b.get())) {
+            for (auto key : aStruct->sortedKeys()) {
+                if (!bStruct->fields.contains(key))
+                    return false;
+                
+                if (aStruct->fields.at(key)->compare(*bStruct->fields.at(key)) != 0)
+                    return false;
+            }
+
+            return true;
+        }
     }
 
     return false;

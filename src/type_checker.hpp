@@ -76,6 +76,7 @@ private:
     void visit(TupleTypeExpr& expr) override;
     void visit(UnionTypeExpr& expr) override;
     void visit(LambdaTypeExpr& expr) override;
+    void visit(StructTypeExpr& expr) override;
     TypePtr visit(TypeExpr* expr);
 };
 

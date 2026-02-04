@@ -17,6 +17,7 @@ add_executable(spectr
     src/lexer.cpp
     src/type.cpp
     src/expression.cpp
+    src/type_expression.cpp
     src/statement.cpp
     src/parser.cpp
     src/name_resolution.cpp

@@ -3,7 +3,12 @@
 #include <memory>
 #include <set>
 #include <algorithm>
-#include "type_expression.hpp"
+#include <unordered_map>
+#include <vector>
+#include "base.hpp"
+
+const std::string primTypeColor = "\033[32m";
+const std::string typeConColor  = "\033[33m";
 
 enum class TypeKind {
     INVALID,
@@ -37,6 +42,14 @@ struct TypeLess {
     bool operator()(const TypePtr& a, const TypePtr& b) const {
         return a->compare(*b) < 0;
     }
+};
+
+enum class Prim {
+    Void,
+    Bool,
+    Int,
+    Num,
+    Str
 };
 
 struct PrimType : Type {
@@ -126,52 +139,30 @@ struct LambdaType : Type {
 };
 
 struct StructType : Type {
-    std::unique_ptr<std::string> name;
     TypePtr super;
     std::unordered_map<std::string, TypePtr> fields;
     TypeKind kind() const override { return TypeKind::Struct; }
     
-    static std::vector<std::string> sortedKeys(const std::unordered_map<std::string, TypePtr>& m) {
+    std::vector<std::string> sortedKeys() const {
         std::vector<std::string> keys;
-        keys.reserve(m.size());
-        for (auto& [k, _] : m) keys.push_back(k);
+        keys.reserve(fields.size());
+        for (auto& [k, _] : fields) keys.push_back(k);
         std::sort(keys.begin(), keys.end());
         return keys;
     }
 
-    int compare(const Type& other) const override {
-        if (auto o = dynamic_cast<const StructType*>(&other)) {
-            if (name && o->name && *name != *o->name)
-                return *name < *o->name ? -1 : 1;
+    int compare(const Type& other) const override;
+    std::string show() const override;
 
-            int d = (o->super == nullptr) - (super == nullptr);
-            if (d != 0) return d;
-
-            if (super) {
-                d = super->compare(*o->super);
-                if (d != 0) return d;
-            }
-
-            d = fields.size() - o->fields.size();
-            if (d != 0) return d;
-
-            auto keysA = sortedKeys(fields);
-            auto keysB = sortedKeys(o->fields);
-
-            for (size_t i = 0; i < keysA.size(); i++) {
-                if (keysA[i] != keysB[i])
-                    return keysA[i] < keysB[i] ? -1 : 1;
-                
-                d = fields.at(keysA[i])->compare(*o->fields.at(keysB[i]));
-                if (d != 0) return d;
-            }
-        }
-
-        return int(kind()) - int(other.kind());
+    static TypePtr fromFields(const std::unordered_map<std::string, TypePtr>& fields) {
+        if (fields.size() == 0)
+            return VOID_TYPE;
+        
+        return std::make_shared<StructType>(nullptr, fields);
     }
 
-    StructType(const std::string& name, TypePtr super, std::unordered_map<std::string, TypePtr> fields) :
-        name(name.size() > 0 ? std::make_unique<std::string>(name) : nullptr), super(super), fields(fields) {}
+    StructType(TypePtr super, const std::unordered_map<std::string, TypePtr>& fields) :
+        super(super), fields(fields) {}
 };
 
 struct AnyType : Type {

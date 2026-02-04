@@ -5,17 +5,6 @@
 #include "lexer.hpp"
 #include "type.hpp"
 
-const std::string primTypeColor = "\033[32m";
-const std::string typeConColor  = "\033[33m";
-
-enum class Prim {
-    Void,
-    Bool,
-    Int,
-    Num,
-    Str
-};
-
 const std::unordered_map<Prim, std::string> primNames = {
 #define X(kw, tok, lit, pt) {Prim::pt, kw},
     PRIMITIVE_TYPES
@@ -56,6 +45,7 @@ struct ListTypeExpr;
 struct TupleTypeExpr;
 struct UnionTypeExpr;
 struct LambdaTypeExpr;
+struct StructTypeExpr;
 
 class TypeExprVisitor {
 public:
@@ -68,6 +58,7 @@ public:
     virtual void visit(TupleTypeExpr& expr)  = 0;
     virtual void visit(UnionTypeExpr& expr)  = 0;
     virtual void visit(LambdaTypeExpr& expr) = 0;
+    virtual void visit(StructTypeExpr& expr) = 0;
 };
 
 struct PrimTypeExpr : TypeExpr {
@@ -153,4 +144,14 @@ struct LambdaTypeExpr : TypeExpr {
     LambdaTypeExpr(std::unique_ptr<TypeExpr> arg, std::unique_ptr<TypeExpr> out) :
         TypeExpr(arg->start(), out->start() - arg->start() + out->length()),
         arg(std::move(arg)), out(std::move(out)) {}
+};
+
+struct VarDeclStmt;
+
+struct StructTypeExpr : TypeExpr {
+    std::vector<std::unique_ptr<VarDeclStmt>> stmts;
+    std::string show() const override;
+
+    void accept(TypeExprVisitor& v) override { v.visit(*this); }
+    StructTypeExpr(std::vector<std::unique_ptr<VarDeclStmt>> stmts, size_t start, size_t length);
 };

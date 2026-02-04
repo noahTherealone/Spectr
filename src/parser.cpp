@@ -356,44 +356,7 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
         }
         case TokenType::LParen:
         case TokenType::FunAppl: {
-            if (peek() && peek()->type == TokenType::RParen)
-                return std::make_unique<PrimTypeExpr>(Prim::Void, tok.index, peek()->index - tok.index + next()->text.length());
-
-            auto type = parseTypeExpr();
-            if (!peek()) {
-                throw SyntaxError("Unclosed parentheses in type expression", tokens[index-1].index + tokens[index-1].text.length(), 0);
-            }
-
-            if (peek()->type == TokenType::RParen) {
-                next();
-                return std::move(type);
-            }
-
-            std::vector<std::unique_ptr<TypeExpr>> types;
-            types.push_back(std::move(type));
-            while (true) {
-                if (!peek()) {
-                    throw SyntaxError("Unclosed parentheses in type expression", tokens[index-1].index + tokens[index-1].text.length(), 0);
-                }
-
-                if (peek()->type == TokenType::RParen) {
-                    break;
-                }
-
-                if (peek()->type != TokenType::Comma) {
-                    throw SyntaxError("Unexpected token in type expression", peek()->index, peek()->text.length());
-                }
-
-                next();
-
-                if (peek()->type == TokenType::RParen) {
-                    break;
-                }
-
-                types.push_back(parseTypeExpr());
-            }
-
-            return std::make_unique<TupleTypeExpr>(std::move(types), tok.index, peek()->index - tok.index + next()->text.length());
+            return parseTypeParen(tok.index);
         }
         case TokenType::LBrace: {
             auto type = parseTypeExpr();
@@ -403,8 +366,11 @@ std::unique_ptr<TypeExpr> Parser::typeNud(const Token& tok) {
 
             return std::make_unique<ListTypeExpr>(std::move(type), tok.index, peek()->index - tok.index + next()->text.length());
         }
+        case TokenType::LBracket: {
+            return parseStructType(tok.index);
+        }
     }
-    
+
     throw SyntaxError("Could not parse type", tok.index, tok.text.length());
 }
 
@@ -442,9 +408,68 @@ std::unique_ptr<TypeExpr> Parser::typeLed(std::unique_ptr<TypeExpr> left, const 
     throw std::exception(); // this shouldn't happen
 }
 
+std::unique_ptr<TypeExpr> Parser::parseTypeParen(size_t start) {
+    if (peek() && peek()->type == TokenType::RParen)
+        return std::make_unique<PrimTypeExpr>(Prim::Void, start, peek()->index - start + next()->text.length());
+
+    auto type = parseTypeExpr();
+    if (!peek()) {
+        throw SyntaxError("Unclosed parentheses in type expression", tokens[index-1].index + tokens[index-1].text.length(), 0);
+    }
+
+    if (peek()->type == TokenType::RParen) {
+        next();
+        return std::move(type);
+    }
+
+    std::vector<std::unique_ptr<TypeExpr>> types;
+    types.push_back(std::move(type));
+    while (true) {
+        if (!peek()) {
+            throw SyntaxError("Unclosed parentheses in type expression", tokens[index-1].index + tokens[index-1].text.length(), 0);
+        }
+
+        if (peek()->type == TokenType::RParen) {
+            break;
+        }
+
+        if (peek()->type != TokenType::Comma) {
+            throw SyntaxError("Unexpected token in type expression", peek()->index, peek()->text.length());
+        }
+
+        next();
+
+        if (peek()->type == TokenType::RParen) {
+            break;
+        }
+
+        types.push_back(parseTypeExpr());
+    }
+
+    return std::make_unique<TupleTypeExpr>(std::move(types), start, peek()->index - start + next()->text.length());
+}
+
 std::unique_ptr<TypeExpr> Parser::parseLambdaType(std::unique_ptr<TypeExpr> left) {
     auto out = parseTypeExpr(5);
     return std::make_unique<LambdaTypeExpr>(std::move(left), std::move(out));
+}
+
+std::unique_ptr<TypeExpr> Parser::parseStructType(size_t start) {
+    std::vector<std::unique_ptr<VarDeclStmt>> stmts;
+    while (true) {
+        if (!peek()) throw SyntaxError("Unclosed bracket in type expression", tokens.back().index + tokens.back().text.length(), 0);
+        if (peek()->type == TokenType::RBracket) break;
+
+        auto stmt = parseStatement();
+        if (auto vDecl = dynamic_cast<VarDeclStmt*>(stmt.get())) {
+            stmts.push_back(std::unique_ptr<VarDeclStmt>(static_cast<VarDeclStmt*>(stmt.release())));
+        }
+        else {
+            throw SyntaxError("Only variable declarations are allowed inside type bodies", stmt->start(), stmt->length());
+        }
+    }
+
+    return std::make_unique<StructTypeExpr>(std::move(stmts), start, peek()->index - start + next()->text.length());
 }
 
 #pragma endregion
@@ -518,6 +543,35 @@ std::unique_ptr<Stmt> Parser::matchAssignment(std::unique_ptr<Expr> lhs, const T
         return std::make_unique<AssignmentStmt>(std::move(lhs), std::move(value));
     else
         return std::make_unique<ReferenceDeclStmt>(std::move(lhs), std::move(value));
+}
+
+std::unique_ptr<Stmt> Parser::matchTypeStmt(const Token& tok) {
+    next();
+    if (!peek())
+        throw SyntaxError("Expected type name", tokens.back().index + tokens.back().text.length(), 0);
+
+    if (peek()->type != TokenType::Identifier)
+        throw SyntaxError("Expected type name", tok.index, tok.text.length());
+    
+    auto id = std::make_unique<NamedTypeExpr>(*next());
+    if (!peek())
+        throw SyntaxError("Expected either type alias or type definition", tokens.back().index + tokens.back().text.length(), 0);
+
+    switch (peek()->type) {
+        case TokenType::LineBreak: {
+            throw SyntaxError("Expected either type alias or type definition", peek()->index, peek()->text.length());
+        }
+        case TokenType::Assign: {
+            next();
+            auto value = parseTypeExpr();
+            if (peek() && peek()->type != TokenType::LineBreak)
+                throw SyntaxError("Unexpected tokens after type alias", 0, 0);
+            
+            return std::make_unique<AliasDeclStmt>(std::move(id), std::move(value));
+        }
+        default:
+            throw SyntaxError("Unexpected token after type name", peek()->index, peek()->text.length());
+    }
 }
 
 std::unique_ptr<Stmt> Parser::matchIf() {
@@ -613,50 +667,41 @@ std::unique_ptr<Stmt> Parser::parseStatement() {
 
     Token *tok = peek();
     if (!tok) return nullptr;
-    if (tok->type == TokenType::IF) {
-        return matchIf();
-    }
-    else if (tok->type == TokenType::RETURN) {
-        next();
-        auto expr = parseExpr();
-        return std::make_unique<ReturnStmt>(std::move(expr), tok->index);
-    }
-    else if (tok->type == TokenType::TYPE) {
-        next();
-        if (!peek())
-            throw SyntaxError("Expected type name", tokens.back().index + tokens.back().text.length(), 0);
-        if (peek()->type != TokenType::Identifier)
-            throw SyntaxError("Expected type name", tok->index, tok->text.length());
-        
-        auto id = std::make_unique<NamedTypeExpr>(*next());
-        expect(TokenType::Assign);
-        auto value = parseTypeExpr();
-        if (peek() && peek()->type != TokenType::LineBreak)
-            throw SyntaxError("Unexpected tokens after type alias", 0, 0);
-        
-        return std::make_unique<AliasDeclStmt>(std::move(id), std::move(value));
-    }
-    else if (tok->type == TokenType::Identifier) {
-        next();
-        if (!peek()) {
-            return std::make_unique<ExprStmt>(std::make_unique<IdentifierExpr>(*tok));
-        }
 
-        if (peek()->type == TokenType::TypeMarker) {
-            auto idPtr = std::make_unique<IdentifierExpr>(*tok);
-            return matchExplicitVarDecl(std::move(idPtr), *next());
+    switch (tok->type) {
+        case TokenType::IF: {
+            return matchIf();
         }
-
-        if (peek()->type == TokenType::TypeInferredAssign) {
-            auto idPtr = std::make_unique<IdentifierExpr>(*tok);
-            return matchInferredVarDecl(std::move(idPtr), *next());
+        case TokenType::RETURN: {
+            next();
+            auto expr = parseExpr();
+            return std::make_unique<ReturnStmt>(std::move(expr), tok->index);
         }
+        case TokenType::TYPE: {
+            return matchTypeStmt(*tok);
+        }
+        case TokenType::Identifier: {
+            next();
+            if (!peek()) {
+                return std::make_unique<ExprStmt>(std::make_unique<IdentifierExpr>(*tok));
+            }
 
-        index--;
-        return matchExpr();
-    }
-    else {
-        return matchExpr();
+            if (peek()->type == TokenType::TypeMarker) {
+                auto idPtr = std::make_unique<IdentifierExpr>(*tok);
+                return matchExplicitVarDecl(std::move(idPtr), *next());
+            }
+
+            if (peek()->type == TokenType::TypeInferredAssign) {
+                auto idPtr = std::make_unique<IdentifierExpr>(*tok);
+                return matchInferredVarDecl(std::move(idPtr), *next());
+            }
+
+            index--;
+            return matchExpr();
+        }
+        default: {
+            return matchExpr();
+        }
     }
 
     throw SyntaxError("Invalid statement shape", tok->index, peek()->index - tok->index + peek()->text.length());

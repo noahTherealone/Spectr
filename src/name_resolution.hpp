@@ -5,6 +5,7 @@
 #include "type.hpp"
 #include "statement.hpp"
 #include "expression.hpp"
+#include "type_expression.hpp"
 
 struct NameError : SpectrError {
     using SpectrError::SpectrError;
@@ -123,6 +124,15 @@ struct TupleExpr;
 struct BlockExpr;
 struct LambdaExpr;
 
+struct PrimTypeExpr;
+struct AnyTypeExpr;
+struct NamedTypeExpr;
+struct ListTypeExpr;
+struct TupleTypeExpr;
+struct UnionTypeExpr;
+struct LambdaTypeExpr;
+struct StructTypeExpr;
+
 class StmtVisitor;
 class ExprVisitor;
 class TypeExprVisitor;
@@ -189,4 +199,5 @@ private:
     void visit(TupleTypeExpr& expr) override;
     void visit(UnionTypeExpr& expr) override;
     void visit(LambdaTypeExpr& expr) override;
+    void visit(StructTypeExpr& expr) override;
 };

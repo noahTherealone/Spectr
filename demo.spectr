@@ -1,3 +1,20 @@
+
+
+type test = [
+    name: str
+    number: int
+]
+
+x: test
+
+y: [
+    number: int
+    name: str
+]
+
+z: test = x
+
+#[
 func: int -> int
 
 eval: (int -> int, int) -> int = (f, i) -> f i
@@ -6,3 +23,4 @@ eval (func, 5i)
 curry: ((int -> int, int) -> int) -> ((int -> int) -> int -> int) = unseasoned -> f -> i -> unseasoned (f("bruh"), i)
 
 (curry eval) func 5i
+]#
