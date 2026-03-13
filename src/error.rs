@@ -42,7 +42,7 @@ impl<'a> File<'a> {
 
     pub fn get_position(&self, index: usize) -> (usize, usize) {
         if self.line_breaks.len() == 0 {
-            return (0, index);
+            return (1, index+1);
         }
 
         let mut line = 1;
@@ -50,7 +50,7 @@ impl<'a> File<'a> {
             line += 1;
         }
 
-        (line, index - self.line_breaks[line-1])
+        (line, index + 1 - self.line_breaks[line-1])
     }
 
     pub fn display_position(&self, index: usize) -> String {
@@ -63,6 +63,12 @@ impl<'a> File<'a> {
 pub struct SourceRange {
     pub start: usize,
     pub length: usize
+}
+
+impl SourceRange {
+    pub fn span_two(first: SourceRange, second: SourceRange) -> SourceRange {
+        SourceRange { start: first.start, length: second.start - first.start + second.length }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -97,17 +103,24 @@ pub enum SpectrErrorType {
 #[derive(Debug, Clone)]
 pub struct SpectrError {
     pub error_type: SpectrErrorType,
-    pub src: SourceRange,
+    pub src: Option<SourceRange>,
     pub msg: String,
 }
 
 impl SpectrError {
     pub fn display<'a>(&self, file: &'a File<'a>) -> String {
-        format!(
-            "{} at {}: {}",
-            self.error_type,
-            file.display_position(self.src.start),
-            self.msg
-        )
+        match self.src {
+            Some(span) => format!(
+                "{} at {}: {}",
+                self.error_type,
+                file.display_position(span.start),
+                self.msg
+            ),
+            None => format!(
+                "{} from unknown source: {}",
+                self.error_type,
+                self.msg
+            ),
+        }
     }
 }

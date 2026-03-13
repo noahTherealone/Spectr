@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use once_cell::sync::Lazy;
 
 use crate::error::*;
+use colored::*;
 
 #[derive(Debug, EnumIter, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum TokenType {
@@ -29,6 +30,7 @@ pub enum TokenType {
     RBrace,
     LBracket,
     RBracket,
+    Comma,
     RightArrow,
     DoubleRightArrow,
     Colon,
@@ -38,9 +40,18 @@ pub enum TokenType {
     ColonAssign,
     DoubleColonAssign,
 
+    KIND,
+    TYPE,
+    VALUE,
+
     TRUE,
     FALSE,
     NIL,
+
+    AND,
+    OR,
+    NOT,
+    XOR,
 
     IF,
     ELIF,
@@ -54,9 +65,16 @@ pub enum TokenType {
 }
 
 static TOKEN_KEYWORDS: &[(&str, TokenType)] = &[
+    ("kind",  TokenType::KIND),
+    ("type",  TokenType::TYPE),
+    ("value", TokenType::VALUE),
     ("true",  TokenType::TRUE),
     ("false", TokenType::FALSE),
     ("nil",   TokenType::NIL),
+    ("and",   TokenType::AND),
+    ("or",    TokenType::OR),
+    ("not",   TokenType::NOT),
+    ("xor",   TokenType::XOR),
     ("if",    TokenType::IF),
     ("elif",  TokenType::ELIF),
     ("else",  TokenType::ELSE),
@@ -75,30 +93,31 @@ static TOKEN_TYPE_TO_KEYWORD: Lazy<HashMap<TokenType, &'static str>> = Lazy::new
 );
 
 static TOKEN_SYMBOLS: &[(&str, TokenType)] = &[
-    ("+", TokenType::Plus),
-    ("-", TokenType::Minus),
-    ("*", TokenType::Star),
-    ("/", TokenType::Slash),
-    ("%", TokenType::Modulus),
-    ("&", TokenType::Ampersand),
-    ("|", TokenType::Bar),
-    ("==", TokenType::Equals),
-    ("<", TokenType::Less),
-    ("<=", TokenType::LessEqual),
-    (">", TokenType::Greater),
-    (">=", TokenType::GreaterEqual),
-    ("(", TokenType::LParen),
-    (")", TokenType::RParen),
-    ("{", TokenType::LBrace),
-    ("}", TokenType::RBrace),
-    ("[", TokenType::RBracket),
-    ("]", TokenType::RBracket),
-    ("->", TokenType::RightArrow),
-    ("=>", TokenType::DoubleRightArrow),
-    (":", TokenType::Colon),
-    ("::", TokenType::DoubleColon),
-    ("=", TokenType::Assign),
-    (":=", TokenType::ColonAssign),
+    ("+",   TokenType::Plus),
+    ("-",   TokenType::Minus),
+    ("*",   TokenType::Star),
+    ("/",   TokenType::Slash),
+    ("%",   TokenType::Modulus),
+    ("&",   TokenType::Ampersand),
+    ("|",   TokenType::Bar),
+    ("==",  TokenType::Equals),
+    ("<",   TokenType::Less),
+    ("<=",  TokenType::LessEqual),
+    (">",   TokenType::Greater),
+    (">=",  TokenType::GreaterEqual),
+    ("(",   TokenType::LParen),
+    (")",   TokenType::RParen),
+    ("{",   TokenType::LBrace),
+    ("}",   TokenType::RBrace),
+    ("[",   TokenType::RBracket),
+    ("]",   TokenType::RBracket),
+    (",",   TokenType::Comma),
+    ("->",  TokenType::RightArrow),
+    ("=>",  TokenType::DoubleRightArrow),
+    (":",   TokenType::Colon),
+    ("::",  TokenType::DoubleColon),
+    ("=",   TokenType::Assign),
+    (":=",  TokenType::ColonAssign),
     ("::=", TokenType::DoubleColonAssign)
 ];
 
@@ -174,15 +193,15 @@ impl<'a> Lexer<'a> {
         let start_index = self.index;
         let mut found_dot = false;
 
-        while let Some(ch) = self.next() {
+        while let Some(ch) = self.peek() {
             if ch == '.' {
                 if found_dot {
                     return Err(SpectrError {
                         error_type: SpectrErrorType::LexerError,
-                        src: SourceRange {
+                        src: Some(SourceRange {
                             start: start_index,
                             length: self.index - start_index,
-                        },
+                        }),
                         msg: "found two dots inside numeric literal".to_string(),
                     })
                 }
@@ -192,6 +211,7 @@ impl<'a> Lexer<'a> {
             }
 
             if !ch.is_numeric() { break; }
+            self.next();
         }
 
         let literal: &str = &self.file.code[start_pos..self.pos];
@@ -234,7 +254,7 @@ impl<'a> Lexer<'a> {
             if candidates.is_empty() {
                 return Err(SpectrError {
                     error_type: SpectrErrorType::LexerError,
-                    src: SourceRange { start: start_index, length: self.index - start_index },
+                    src: Some(SourceRange { start: start_index, length: self.index - start_index }),
                     msg: "couldn't match symbol".to_string(),
                 });
             }
@@ -256,31 +276,35 @@ impl<'a> Lexer<'a> {
 
         Err(SpectrError {
             error_type: SpectrErrorType::LexerError,
-            src: SourceRange { start: start_index, length: self.index - start_index }, msg: "couldn't match symbol".to_string(),
+            src: Some(SourceRange { start: start_index, length: self.index - start_index }),
+            msg: "couldn't match symbol".to_string(),
         })
     }
 
     pub fn tokenize_file(file: &'a File<'a>) -> Vec<Token<'a>> {
         let mut lexer = Lexer::new(file);
 
-        while let Some(ch) = lexer.next() {
+        while let Some(ch) = lexer.peek() {
             if ch == '\n' {
                 lexer.tokens.push(Token {
                     token_type: TokenType::LnBreak,
                     text: "\n",
                     source_range: SourceRange { start: lexer.index, length: 1 }
                 });
+
+                lexer.next();
                 continue;
             }
 
             if ch.is_whitespace() {
+                lexer.next();
                 continue;
             }
 
             if ch.is_numeric() {
                 match lexer.tokenize_number() {
                     Ok(token) => lexer.tokens.push(token),
-                    Err(err) => eprintln!("{}", err.display(lexer.file)),
+                    Err(err) => eprintln!("{}", err.display(lexer.file).red()),
                 }
                 
                 continue;
